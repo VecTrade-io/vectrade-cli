@@ -1,0 +1,182 @@
+package auth
+
+import (
+	"context"
+	"io"
+	"net/http"
+	"testing"
+	"time"
+)
+
+func TestCallbackServer_StartsAndListens(t *testing.T) {
+	srv, err := newCallbackServer()
+	if err != nil {
+		t.Fatalf("newCallbackServer: %v", err)
+	}
+	srv.Start()
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = srv.server.Shutdown(ctx)
+	}()
+
+	port := srv.Port()
+	if port < 1024 || port > 65535 {
+		t.Errorf("Port() = %d, want ephemeral port 1024-65535", port)
+	}
+}
+
+func TestCallbackServer_SuccessfulCallback(t *testing.T) {
+	srv, err := newCallbackServer()
+	if err != nil {
+		t.Fatalf("newCallbackServer: %v", err)
+	}
+	srv.Start()
+
+	port := srv.Port()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Simulate the OAuth provider redirecting to callback
+	callbackURL := "http://127.0.0.1:" + itoa(port) + "/callback?code=test_code_123&state=test_state"
+	resp, err := http.Get(callbackURL) //nolint:gosec // test-only localhost
+	if err != nil {
+		t.Fatalf("GET callback: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("callback status = %d, want 200", resp.StatusCode)
+	}
+
+	// Verify HTML success page returned
+	body, _ := io.ReadAll(resp.Body)
+	if len(body) == 0 {
+		t.Error("empty response body")
+	}
+
+	// WaitForCallback should return immediately with the code
+	result, err := srv.WaitForCallback(ctx)
+	if err != nil {
+		t.Fatalf("WaitForCallback: %v", err)
+	}
+	if result.Code != "test_code_123" {
+		t.Errorf("Code = %q, want %q", result.Code, "test_code_123")
+	}
+	if result.State != "test_state" {
+		t.Errorf("State = %q, want %q", result.State, "test_state")
+	}
+	if result.Error != "" {
+		t.Errorf("Error = %q, want empty", result.Error)
+	}
+}
+
+func TestCallbackServer_ErrorCallback(t *testing.T) {
+	srv, err := newCallbackServer()
+	if err != nil {
+		t.Fatalf("newCallbackServer: %v", err)
+	}
+	srv.Start()
+
+	port := srv.Port()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	callbackURL := "http://127.0.0.1:" + itoa(port) + "/callback?error=access_denied&error_description=User+denied+access"
+	resp, err := http.Get(callbackURL) //nolint:gosec // test-only localhost
+	if err != nil {
+		t.Fatalf("GET callback: %v", err)
+	}
+	resp.Body.Close()
+
+	result, err := srv.WaitForCallback(ctx)
+	if err != nil {
+		t.Fatalf("WaitForCallback: %v", err)
+	}
+	if result.Error != "User denied access" {
+		t.Errorf("Error = %q, want %q", result.Error, "User denied access")
+	}
+}
+
+func TestCallbackServer_MissingCode(t *testing.T) {
+	srv, err := newCallbackServer()
+	if err != nil {
+		t.Fatalf("newCallbackServer: %v", err)
+	}
+	srv.Start()
+
+	port := srv.Port()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	callbackURL := "http://127.0.0.1:" + itoa(port) + "/callback?state=orphan_state"
+	resp, err := http.Get(callbackURL) //nolint:gosec // test-only localhost
+	if err != nil {
+		t.Fatalf("GET callback: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", resp.StatusCode)
+	}
+
+	result, err := srv.WaitForCallback(ctx)
+	if err != nil {
+		t.Fatalf("WaitForCallback: %v", err)
+	}
+	if result.Error == "" {
+		t.Error("expected non-empty error for missing code")
+	}
+}
+
+func TestCallbackServer_Timeout(t *testing.T) {
+	srv, err := newCallbackServer()
+	if err != nil {
+		t.Fatalf("newCallbackServer: %v", err)
+	}
+	srv.Start()
+
+	// Use a very short timeout so the test doesn't wait long
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	_, err = srv.WaitForCallback(ctx)
+	if err == nil {
+		t.Error("expected timeout error, got nil")
+	}
+}
+
+func TestSupportedProviders(t *testing.T) {
+	expected := map[string]bool{
+		"google":    false,
+		"microsoft": false,
+		"apple":     false,
+		"x":         false,
+	}
+
+	for _, p := range SupportedProviders {
+		if _, ok := expected[p]; !ok {
+			t.Errorf("unexpected provider %q", p)
+		}
+		expected[p] = true
+	}
+
+	for p, found := range expected {
+		if !found {
+			t.Errorf("missing expected provider %q", p)
+		}
+	}
+}
+
+// itoa is a simple int-to-string helper to avoid importing strconv.
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	s := ""
+	for n > 0 {
+		s = string(rune('0'+n%10)) + s
+		n /= 10
+	}
+	return s
+}

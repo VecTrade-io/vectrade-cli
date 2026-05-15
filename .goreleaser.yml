@@ -1,0 +1,148 @@
+version: 2
+
+project_name: vectrade-cli
+
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+
+builds:
+  - id: vectrade
+    binary: vectrade
+    main: ./main.go
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/VecTrade-io/vectrade-cli/cmd.version={{.Version}}
+      - -X github.com/VecTrade-io/vectrade-cli/cmd.commit={{.ShortCommit}}
+      - -X github.com/VecTrade-io/vectrade-cli/cmd.date={{.Date}}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: default
+    format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - completions/*
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+  groups:
+    - title: "Features"
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: "Bug Fixes"
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: "Other"
+      order: 999
+
+brews:
+  - repository:
+      owner: VecTrade-io
+      name: homebrew-vectrade
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/VecTrade-io/vectrade-cli"
+    description: "VecTrade CLI — financial data from your terminal"
+    license: "MIT"
+    install: |
+      bin.install "vectrade"
+      bash_completion.install "completions/vectrade.bash" => "vectrade"
+      zsh_completion.install "completions/vectrade.zsh" => "_vectrade"
+      fish_completion.install "completions/vectrade.fish"
+    test: |
+      system "#{bin}/vectrade", "version"
+
+scoops:
+  - repository:
+      owner: VecTrade-io
+      name: scoop-vectrade
+      token: "{{ .Env.SCOOP_BUCKET_TOKEN }}"
+    homepage: "https://github.com/VecTrade-io/vectrade-cli"
+    description: "VecTrade CLI — financial data from your terminal"
+    license: "MIT"
+
+nfpms:
+  - id: packages
+    package_name: vectrade-cli
+    homepage: "https://github.com/VecTrade-io/vectrade-cli"
+    description: "VecTrade CLI — financial data from your terminal"
+    maintainer: "VecTrade <oss@vectrade.io>"
+    license: "MIT"
+    formats:
+      - deb
+      - rpm
+      - apk
+    bindir: /usr/bin
+    contents:
+      - src: completions/vectrade.bash
+        dst: /etc/bash_completion.d/vectrade
+      - src: completions/vectrade.zsh
+        dst: /usr/share/zsh/site-functions/_vectrade
+      - src: completions/vectrade.fish
+        dst: /usr/share/fish/vendor_completions.d/vectrade.fish
+
+dockers:
+  - image_templates:
+      - "ghcr.io/vectrade-io/vectrade-cli:{{ .Version }}-amd64"
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+    goarch: amd64
+  - image_templates:
+      - "ghcr.io/vectrade-io/vectrade-cli:{{ .Version }}-arm64"
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+    goarch: arm64
+
+docker_manifests:
+  - name_template: "ghcr.io/vectrade-io/vectrade-cli:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/vectrade-io/vectrade-cli:{{ .Version }}-amd64"
+      - "ghcr.io/vectrade-io/vectrade-cli:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/vectrade-io/vectrade-cli:latest"
+    image_templates:
+      - "ghcr.io/vectrade-io/vectrade-cli:{{ .Version }}-amd64"
+      - "ghcr.io/vectrade-io/vectrade-cli:{{ .Version }}-arm64"
+
+signs:
+  - artifacts: checksum
+    cmd: cosign
+    args:
+      - "sign-blob"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - "--yes"
+
+sboms:
+  - artifacts: archive
