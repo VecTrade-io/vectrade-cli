@@ -44,7 +44,7 @@ type Config struct {
 }
 
 // ErrNoAPIKey is returned when no API key can be resolved.
-var ErrNoAPIKey = errors.New("no API key configured. Run 'vt auth login' or set VECTRADE_API_KEY")
+var ErrNoAPIKey = errors.New("no API key configured. Run 'vectrade auth login' or set VECTRADE_API_KEY")
 
 // Load resolves configuration from (in priority order):
 // 1. Explicit flags (apiKey, sandbox)

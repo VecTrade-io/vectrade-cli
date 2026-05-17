@@ -140,3 +140,78 @@ func TestLoad_TrailingSlashStripped(t *testing.T) {
 		t.Errorf("expected trailing slash stripped, got %s", cfg.BaseURL)
 	}
 }
+
+func TestValidate_HTTPSRequired(t *testing.T) {
+	cfg := &Config{APIKey: "vq_test_key", BaseURL: "http://evil.com"}
+	if err := cfg.Validate(); err == nil {
+		t.Error("expected error for non-HTTPS URL")
+	}
+}
+
+func TestValidate_LocalhostHTTPAllowed(t *testing.T) {
+	tests := []string{
+		"http://localhost:8080",
+		"http://127.0.0.1:3000",
+	}
+	for _, url := range tests {
+		cfg := &Config{APIKey: "vq_test_key", BaseURL: url}
+		if err := cfg.Validate(); err != nil {
+			t.Errorf("localhost URL %q should be allowed, got: %v", url, err)
+		}
+	}
+}
+
+func TestValidate_JWTTokenSufficient(t *testing.T) {
+	cfg := &Config{JWTToken: "jwt_token", BaseURL: DefaultBaseURL}
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("JWT should be sufficient for validation: %v", err)
+	}
+}
+
+func TestAuthHeader_PrefersAPIKey(t *testing.T) {
+	cfg := &Config{APIKey: "vq_key", JWTToken: "jwt_tok"}
+	if got := cfg.AuthHeader(); got != "Bearer vq_key" {
+		t.Errorf("expected 'Bearer vq_key', got %q", got)
+	}
+}
+
+func TestAuthHeader_FallsBackToJWT(t *testing.T) {
+	cfg := &Config{JWTToken: "jwt_tok"}
+	if got := cfg.AuthHeader(); got != "Bearer jwt_tok" {
+		t.Errorf("expected 'Bearer jwt_tok', got %q", got)
+	}
+}
+
+func TestIsTruthy(t *testing.T) {
+	for _, v := range []string{"true", "TRUE", "1", "yes", "YES", " true "} {
+		if !isTruthy(v) {
+			t.Errorf("isTruthy(%q) should be true", v)
+		}
+	}
+	for _, v := range []string{"false", "0", "no", "", "maybe"} {
+		if isTruthy(v) {
+			t.Errorf("isTruthy(%q) should be false", v)
+		}
+	}
+}
+
+func TestLoad_MalformedConfigFile(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(cfgPath, []byte("{{{{invalid yaml"), 0600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	t.Setenv(EnvAPIKey, "vq_test_key")
+	t.Setenv(EnvBaseURL, "")
+	t.Setenv(EnvSandbox, "")
+
+	// Should not error — malformed config is silently ignored, env takes over
+	cfg, err := Load("", false, cfgPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.APIKey != "vq_test_key" {
+		t.Errorf("expected env key, got %s", cfg.APIKey)
+	}
+}

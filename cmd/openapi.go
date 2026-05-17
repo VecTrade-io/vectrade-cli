@@ -108,7 +108,7 @@ func runOpenapiDiff(cmd *cobra.Command, args []string) error {
 	// Check if local file exists
 	localPath := openapiOutput
 	if _, err := os.Stat(localPath); os.IsNotExist(err) {
-		return fmt.Errorf("local spec not found at %s — run 'vt openapi download' first", localPath)
+		return fmt.Errorf("local spec not found at %s — run 'vectrade openapi download' first", localPath)
 	}
 
 	client := api.NewClient(cfg)
@@ -128,6 +128,6 @@ func runOpenapiDiff(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Fprintf(os.Stdout, "⚠ Spec has changed (local: %d bytes, remote: %d bytes)\n", len(localBody), len(remoteBody))
-	fmt.Fprintln(os.Stdout, "  Run 'vt openapi download' to update.")
+	fmt.Fprintln(os.Stdout, "  Run 'vectrade openapi download' to update.")
 	return nil
 }
