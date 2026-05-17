@@ -2778,6 +2778,26 @@ func TestAuthLogin_InvalidProvider(t *testing.T) {
 	}
 }
 
+func TestAuthLogin_ValidProvider_LoginFails(t *testing.T) {
+	// Use a mock server that returns 500 for the authorize URL request
+	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("server error"))
+	})
+	defer srv.Close()
+
+	t.Setenv("VECTRADE_BASE_URL", srv.URL)
+
+	rootCmd.SetArgs([]string{"auth", "login", "--provider", "google"})
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Error("expected error when login fails")
+	}
+	if !strings.Contains(err.Error(), "authentication failed") {
+		t.Errorf("expected authentication failed error, got: %v", err)
+	}
+}
+
 func TestKeysCreate_InvalidJSON(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -2843,5 +2863,77 @@ func TestUsage_InvalidJSON(t *testing.T) {
 	err := rootCmd.Execute()
 	if err == nil {
 		t.Error("expected error for invalid JSON")
+	}
+}
+
+func TestWebhookList_InvalidJSON(t *testing.T) {
+	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("not json"))
+	})
+	defer srv.Close()
+
+	t.Setenv("VECTRADE_API_KEY", "vq_test_key")
+	t.Setenv("VECTRADE_BASE_URL", srv.URL)
+
+	rootCmd.SetArgs([]string{"webhook", "list"})
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Error("expected error for invalid JSON")
+	}
+}
+
+func TestWebhookCreate_InvalidJSON(t *testing.T) {
+	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("not json"))
+	})
+	defer srv.Close()
+
+	t.Setenv("VECTRADE_API_KEY", "vq_test_key")
+	t.Setenv("VECTRADE_BASE_URL", srv.URL)
+
+	rootCmd.SetArgs([]string{"webhook", "create", "--url", "https://example.com/hook", "--events", "trade.executed"})
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Error("expected error for invalid JSON")
+	}
+}
+
+func TestOpenapiDownload_PathTraversal(t *testing.T) {
+	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("openapi: 3.0.0"))
+	})
+	defer srv.Close()
+
+	t.Setenv("VECTRADE_API_KEY", "vq_test_key")
+	t.Setenv("VECTRADE_BASE_URL", srv.URL)
+
+	rootCmd.SetArgs([]string{"openapi", "download", "--output", "../../../etc/evil.yaml"})
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Error("expected error for path traversal")
+	}
+	if err != nil && !strings.Contains(err.Error(), "output path must be within current directory") {
+		t.Errorf("expected path traversal error, got: %v", err)
+	}
+}
+
+func TestOpenapiDiff_ReadLocalError(t *testing.T) {
+	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("openapi: 3.0.0"))
+	})
+	defer srv.Close()
+
+	t.Setenv("VECTRADE_API_KEY", "vq_test_key")
+	t.Setenv("VECTRADE_BASE_URL", srv.URL)
+
+	// Point to a file that doesn't exist
+	rootCmd.SetArgs([]string{"openapi", "diff", "--output", "nonexistent_spec.yaml"})
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Error("expected error when local spec not found")
 	}
 }

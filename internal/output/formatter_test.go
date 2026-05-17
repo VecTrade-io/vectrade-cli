@@ -173,7 +173,20 @@ func (e *errWriter) Write(p []byte) (int, error) {
 	return 0, fmt.Errorf("write error")
 }
 
-func TestTable_RenderCSV_WriteError(t *testing.T) {
+type errAfterNWriter struct {
+	n       int
+	written int
+}
+
+func (e *errAfterNWriter) Write(p []byte) (int, error) {
+	e.written++
+	if e.written > e.n {
+		return 0, fmt.Errorf("write error after %d writes", e.n)
+	}
+	return len(p), nil
+}
+
+func TestTable_RenderCSV_HeaderWriteError(t *testing.T) {
 	t.Parallel()
 	tbl := NewTable("A", "B")
 	tbl.AddRow("1", "2")
@@ -182,5 +195,22 @@ func TestTable_RenderCSV_WriteError(t *testing.T) {
 	err := tbl.Render(w, FormatCSV)
 	if err == nil {
 		t.Error("expected write error")
+	}
+}
+
+func TestTable_RenderCSV_RowWriteError(t *testing.T) {
+	t.Parallel()
+	tbl := NewTable("A", "B")
+	// Add many rows to overflow the bufio buffer (4096 bytes)
+	longVal := strings.Repeat("x", 500)
+	for i := 0; i < 20; i++ {
+		tbl.AddRow(longVal, longVal)
+	}
+
+	// Succeed on first write (header flush), fail on subsequent
+	w := &errAfterNWriter{n: 1}
+	err := tbl.Render(w, FormatCSV)
+	if err == nil {
+		t.Error("expected write error on row")
 	}
 }

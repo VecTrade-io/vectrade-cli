@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 )
 
@@ -26,38 +25,6 @@ func (c *Credentials) IsExpired() bool {
 		return false // no expiry info, assume valid
 	}
 	return time.Now().After(c.ExpiresAt.Add(-60 * time.Second))
-}
-
-// CredentialsDir returns the XDG-compliant directory for storing credentials.
-// - Linux:   $XDG_CONFIG_HOME/vectrade  (defaults to ~/.config/vectrade)
-// - macOS:   ~/Library/Application Support/vectrade
-// - Windows: %APPDATA%/vectrade
-func CredentialsDir() (string, error) {
-	switch runtime.GOOS {
-	case "darwin":
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("resolving home directory: %w", err)
-		}
-		return filepath.Join(home, "Library", "Application Support", "vectrade"), nil
-
-	case "windows":
-		appData := os.Getenv("APPDATA")
-		if appData == "" {
-			return "", errors.New("APPDATA environment variable not set")
-		}
-		return filepath.Join(appData, "vectrade"), nil
-
-	default: // linux, freebsd, etc.
-		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-			return filepath.Join(xdg, "vectrade"), nil
-		}
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("resolving home directory: %w", err)
-		}
-		return filepath.Join(home, ".config", "vectrade"), nil
-	}
 }
 
 // credentialsPath returns the full path to the credentials file.

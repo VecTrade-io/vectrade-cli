@@ -15,10 +15,7 @@ func TestLoad_DefaultValues(t *testing.T) {
 	t.Setenv(EnvBaseURL, "")
 	t.Setenv(EnvSandbox, "")
 
-	cfg, err := Load("", false, "/nonexistent/path.yaml")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	cfg := Load("", false, "/nonexistent/path.yaml")
 	if cfg.BaseURL != DefaultBaseURL {
 		t.Errorf("expected default base URL, got %s", cfg.BaseURL)
 	}
@@ -34,10 +31,7 @@ func TestLoad_EnvOverrides(t *testing.T) {
 	t.Setenv(EnvAPIKey, "vq_test_from_env")
 	t.Setenv(EnvBaseURL, "https://custom.api.io/v1")
 
-	cfg, err := Load("", false, "/nonexistent/path.yaml")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	cfg := Load("", false, "/nonexistent/path.yaml")
 	if cfg.APIKey != "vq_test_from_env" {
 		t.Errorf("expected env API key, got %s", cfg.APIKey)
 	}
@@ -49,10 +43,7 @@ func TestLoad_EnvOverrides(t *testing.T) {
 func TestLoad_FlagOverridesEnv(t *testing.T) {
 	t.Setenv(EnvAPIKey, "vq_test_env_key")
 
-	cfg, err := Load("vq_test_flag_key", false, "/nonexistent/path.yaml")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	cfg := Load("vq_test_flag_key", false, "/nonexistent/path.yaml")
 	if cfg.APIKey != "vq_test_flag_key" {
 		t.Errorf("expected flag API key, got %s", cfg.APIKey)
 	}
@@ -63,10 +54,7 @@ func TestLoad_SandboxFromEnv(t *testing.T) {
 	t.Setenv(EnvAPIKey, "")
 	t.Setenv(EnvBaseURL, "")
 
-	cfg, err := Load("", false, "/nonexistent/path.yaml")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	cfg := Load("", false, "/nonexistent/path.yaml")
 	if !cfg.Sandbox {
 		t.Error("expected sandbox=true from env")
 	}
@@ -80,10 +68,7 @@ func TestLoad_SandboxFromFlag(t *testing.T) {
 	t.Setenv(EnvBaseURL, "")
 	t.Setenv(EnvAPIKey, "")
 
-	cfg, err := Load("", true, "/nonexistent/path.yaml")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	cfg := Load("", true, "/nonexistent/path.yaml")
 	if cfg.BaseURL != SandboxBaseURL {
 		t.Errorf("expected sandbox URL, got %s", cfg.BaseURL)
 	}
@@ -101,10 +86,7 @@ func TestLoad_ConfigFile(t *testing.T) {
 	t.Setenv(EnvBaseURL, "")
 	t.Setenv(EnvSandbox, "")
 
-	cfg, err := Load("", false, cfgPath)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	cfg := Load("", false, cfgPath)
 	if cfg.APIKey != "vq_test_from_file" {
 		t.Errorf("expected file API key, got %s", cfg.APIKey)
 	}
@@ -135,10 +117,7 @@ func TestLoad_TrailingSlashStripped(t *testing.T) {
 	t.Setenv(EnvAPIKey, "")
 	t.Setenv(EnvSandbox, "")
 
-	cfg, err := Load("", false, "/nonexistent/path.yaml")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	cfg := Load("", false, "/nonexistent/path.yaml")
 	if cfg.BaseURL != "https://api.example.io/v1" {
 		t.Errorf("expected trailing slash stripped, got %s", cfg.BaseURL)
 	}
@@ -209,11 +188,8 @@ func TestLoad_MalformedConfigFile(t *testing.T) {
 	t.Setenv(EnvBaseURL, "")
 	t.Setenv(EnvSandbox, "")
 
-	// Should not error — malformed config is silently ignored, env takes over
-	cfg, err := Load("", false, cfgPath)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	// Malformed config is silently ignored, env takes over
+	cfg := Load("", false, cfgPath)
 	if cfg.APIKey != "vq_test_key" {
 		t.Errorf("expected env key, got %s", cfg.APIKey)
 	}
@@ -302,10 +278,7 @@ func TestLoad_JWTFallbackWhenNoAPIKey(t *testing.T) {
 	data, _ := json.Marshal(creds)
 	os.WriteFile(filepath.Join(credsDir, "credentials.json"), data, 0600)
 
-	cfg, err := Load("", false, "/nonexistent/path.yaml")
-	if err != nil {
-		t.Fatalf("Load: %v", err)
-	}
+	cfg := Load("", false, "/nonexistent/path.yaml")
 	if cfg.JWTToken != "jwt_fallback_tok" {
 		t.Errorf("expected JWT fallback, got %q", cfg.JWTToken)
 	}
@@ -325,10 +298,7 @@ func TestLoad_APIKeyPreventsJWTFallback(t *testing.T) {
 	data, _ := json.Marshal(creds)
 	os.WriteFile(filepath.Join(credsDir, "credentials.json"), data, 0600)
 
-	cfg, err := Load("", false, "/nonexistent/path.yaml")
-	if err != nil {
-		t.Fatalf("Load: %v", err)
-	}
+	cfg := Load("", false, "/nonexistent/path.yaml")
 	if cfg.JWTToken != "" {
 		t.Errorf("JWT should not be loaded when API key is present, got %q", cfg.JWTToken)
 	}
@@ -364,10 +334,7 @@ func TestLoad_SandboxEnvValues(t *testing.T) {
 			t.Setenv(EnvSandbox, v)
 			t.Setenv(EnvAPIKey, "")
 			t.Setenv(EnvBaseURL, "")
-			cfg, err := Load("", false, "/nonexistent/path.yaml")
-			if err != nil {
-				t.Fatalf("Load: %v", err)
-			}
+			cfg := Load("", false, "/nonexistent/path.yaml")
 			if !cfg.Sandbox {
 				t.Errorf("expected sandbox=true for env value %q", v)
 			}
@@ -380,10 +347,7 @@ func TestLoad_SandboxDoesNotOverrideCustomURL(t *testing.T) {
 	t.Setenv(EnvBaseURL, "https://custom.api.io/v1")
 	t.Setenv(EnvSandbox, "")
 
-	cfg, err := Load("", true, "/nonexistent/path.yaml")
-	if err != nil {
-		t.Fatalf("Load: %v", err)
-	}
+	cfg := Load("", true, "/nonexistent/path.yaml")
 	// Sandbox flag should not override a custom URL
 	if cfg.BaseURL != "https://custom.api.io/v1" {
 		t.Errorf("expected custom URL preserved, got %s", cfg.BaseURL)

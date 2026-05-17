@@ -65,10 +65,7 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 	}
 
 	// Resolve base URL
-	cfg, err := config.Load("", sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load("", sandbox, cfgFile)
 
 	fmt.Println()
 	fmt.Println("  VecTrade CLI — Browser Authentication")

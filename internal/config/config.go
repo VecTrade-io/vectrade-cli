@@ -51,7 +51,7 @@ var ErrNoAPIKey = errors.New("no API key configured. Run 'vectrade auth login' o
 // 2. Environment variables
 // 3. Config file (~/.vectrade/config.yaml)
 // 4. Defaults
-func Load(flagAPIKey string, flagSandbox bool, configPath string) (*Config, error) {
+func Load(flagAPIKey string, flagSandbox bool, configPath string) *Config {
 	cfg := &Config{
 		BaseURL: DefaultBaseURL,
 		Timeout: DefaultTimeout,
@@ -100,7 +100,7 @@ func Load(flagAPIKey string, flagSandbox bool, configPath string) (*Config, erro
 		}
 	}
 
-	return cfg, nil
+	return cfg
 }
 
 // Validate checks that required configuration is present.

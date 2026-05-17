@@ -45,10 +45,7 @@ func init() {
 }
 
 func runOpenapiDownload(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load(apiKey, sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load(apiKey, sandbox, cfgFile)
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
@@ -109,10 +106,7 @@ func runOpenapiDownload(cmd *cobra.Command, args []string) error {
 }
 
 func runOpenapiDiff(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load(apiKey, sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load(apiKey, sandbox, cfgFile)
 	if err := cfg.Validate(); err != nil {
 		return err
 	}

@@ -23,10 +23,7 @@ var aiCmd = &cobra.Command{
 func runAI(cmd *cobra.Command, args []string) error {
 	prompt := args[0]
 
-	cfg, err := config.Load(apiKey, sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load(apiKey, sandbox, cfgFile)
 	if err := cfg.Validate(); err != nil {
 		return err
 	}

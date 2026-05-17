@@ -82,10 +82,7 @@ type webhookEntry struct {
 }
 
 func runWebhookListen(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load(apiKey, sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load(apiKey, sandbox, cfgFile)
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
@@ -173,10 +170,7 @@ func forwardEvent(targetURL, data string) {
 }
 
 func runWebhookList(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load(apiKey, sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load(apiKey, sandbox, cfgFile)
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
@@ -211,10 +205,7 @@ func runWebhookList(cmd *cobra.Command, args []string) error {
 }
 
 func runWebhookCreate(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load(apiKey, sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load(apiKey, sandbox, cfgFile)
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
@@ -241,16 +232,13 @@ func runWebhookCreate(cmd *cobra.Command, args []string) error {
 }
 
 func runWebhookDelete(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load(apiKey, sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load(apiKey, sandbox, cfgFile)
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
 
 	client := api.NewClient(cfg)
-	err = client.Delete(context.Background(), fmt.Sprintf("/vq/webhooks/%s", url.PathEscape(args[0])))
+	err := client.Delete(context.Background(), fmt.Sprintf("/vq/webhooks/%s", url.PathEscape(args[0])))
 	if err != nil {
 		return err
 	}
