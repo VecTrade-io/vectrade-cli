@@ -26,6 +26,10 @@ func Execute() error {
 	return rootCmd.Execute()
 }
 
+func RootCmd() *cobra.Command {
+	return rootCmd
+}
+
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default $HOME/.vectrade/config.yaml)")
 	rootCmd.PersistentFlags().StringVar(&apiKey, "api-key", "", "API key (overrides config/env)")
