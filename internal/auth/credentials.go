@@ -28,11 +28,11 @@ func (c *Credentials) IsExpired() bool {
 	return time.Now().After(c.ExpiresAt.Add(-60 * time.Second))
 }
 
-// credentialsDir returns the XDG-compliant directory for storing credentials.
+// CredentialsDir returns the XDG-compliant directory for storing credentials.
 // - Linux:   $XDG_CONFIG_HOME/vectrade  (defaults to ~/.config/vectrade)
 // - macOS:   ~/Library/Application Support/vectrade
 // - Windows: %APPDATA%/vectrade
-func credentialsDir() (string, error) {
+func CredentialsDir() (string, error) {
 	switch runtime.GOOS {
 	case "darwin":
 		home, err := os.UserHomeDir()
@@ -62,7 +62,7 @@ func credentialsDir() (string, error) {
 
 // credentialsPath returns the full path to the credentials file.
 func credentialsPath() (string, error) {
-	dir, err := credentialsDir()
+	dir, err := CredentialsDir()
 	if err != nil {
 		return "", err
 	}

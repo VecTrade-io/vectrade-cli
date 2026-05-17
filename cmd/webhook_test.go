@@ -49,6 +49,9 @@ func TestForwardEvent_SSRF_Blocked(t *testing.T) {
 		{"external_https", "https://evil.com/callback"},
 		{"internal_network", "http://192.168.1.1/hook"},
 		{"metadata", "http://169.254.169.254/latest/meta-data"},
+		{"dns_rebinding", "http://localhost.evil.com/callback"},
+		{"authority_confusion", "http://localhost:@evil.com/"},
+		{"subdomain_bypass", "http://localhost.attacker.io/hook"},
 	}
 
 	for _, tc := range cases {

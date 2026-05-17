@@ -27,6 +27,7 @@ Get started:
   vectrade auth login
   vectrade quote AAPL
   vectrade ai "Analyze MSFT earnings"`,
+	SilenceUsage: true,
 }
 
 func Execute() error {

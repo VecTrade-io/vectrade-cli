@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/VecTrade-io/vectrade-cli/internal/config"
@@ -371,5 +372,53 @@ func TestPost_APIError(t *testing.T) {
 	}
 	if apiErr.Type != "validation" {
 		t.Errorf("expected 'validation', got %s", apiErr.Type)
+	}
+}
+
+func TestGet_ResponseSizeLimit(t *testing.T) {
+	// Server returns a body larger than maxResponseSize
+	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		// Write 11MB of data (exceeds 10MB limit)
+		w.Write([]byte(strings.Repeat("x", maxResponseSize+1024)))
+	})
+	defer srv.Close()
+
+	body, err := client.Get(context.Background(), "/large", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Body should be capped at maxResponseSize
+	if len(body) > maxResponseSize {
+		t.Errorf("response body %d bytes exceeds limit %d", len(body), maxResponseSize)
+	}
+}
+
+func TestGet_QueryParams(t *testing.T) {
+	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("version") != "2.0" {
+			t.Errorf("expected version=2.0, got %s", r.URL.Query().Get("version"))
+		}
+		if r.URL.Query().Get("format") != "yaml" {
+			t.Errorf("expected format=yaml, got %s", r.URL.Query().Get("format"))
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	})
+	defer srv.Close()
+
+	_, err := client.Get(context.Background(), "/test", map[string]string{
+		"version": "2.0",
+		"format":  "yaml",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestMaxResponseSizeConstant(t *testing.T) {
+	expected := 10 * 1024 * 1024
+	if maxResponseSize != expected {
+		t.Errorf("maxResponseSize = %d, want %d (10MB)", maxResponseSize, expected)
 	}
 }

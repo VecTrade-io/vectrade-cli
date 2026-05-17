@@ -6,9 +6,9 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
+	"github.com/VecTrade-io/vectrade-cli/internal/auth"
 	"gopkg.in/yaml.v3"
 )
 
@@ -140,7 +140,7 @@ func isTruthy(val string) bool {
 // loadStoredJWT reads the JWT access token from stored credentials.
 // Returns empty string if no credentials are stored.
 func loadStoredJWT() (string, error) {
-	dir, err := credentialDir()
+	dir, err := auth.CredentialsDir()
 	if err != nil {
 		return "", err
 	}
@@ -156,31 +156,4 @@ func loadStoredJWT() (string, error) {
 		return "", err
 	}
 	return creds.AccessToken, nil
-}
-
-// credentialDir returns the platform-specific directory for VecTrade credentials.
-func credentialDir() (string, error) {
-	switch runtime.GOOS {
-	case "darwin":
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
-		}
-		return filepath.Join(home, "Library", "Application Support", "vectrade"), nil
-	case "windows":
-		appData := os.Getenv("APPDATA")
-		if appData == "" {
-			return "", errors.New("APPDATA not set")
-		}
-		return filepath.Join(appData, "vectrade"), nil
-	default:
-		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-			return filepath.Join(xdg, "vectrade"), nil
-		}
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
-		}
-		return filepath.Join(home, ".config", "vectrade"), nil
-	}
 }

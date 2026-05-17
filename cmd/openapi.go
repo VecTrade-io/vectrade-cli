@@ -75,7 +75,19 @@ func runOpenapiDownload(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("getting working directory: %w", err)
 	}
-	if !strings.HasPrefix(absOutput, cwd) {
+	// Resolve symlinks for both paths to prevent symlink-based path traversal
+	absOutput, err = filepath.EvalSymlinks(filepath.Dir(absOutput))
+	if err != nil {
+		// If parent dir doesn't exist yet, fallback to Abs check
+		absOutput, _ = filepath.Abs(openapiOutput)
+	} else {
+		absOutput = filepath.Join(absOutput, filepath.Base(openapiOutput))
+	}
+	cwdResolved, err := filepath.EvalSymlinks(cwd)
+	if err != nil {
+		cwdResolved = cwd
+	}
+	if !strings.HasPrefix(absOutput, cwdResolved) {
 		return fmt.Errorf("output path must be within current directory (got %s)", absOutput)
 	}
 

@@ -5,6 +5,7 @@ import (
 	"runtime"
 
 	"github.com/spf13/cobra"
+	"github.com/VecTrade-io/vectrade-cli/internal/auth"
 )
 
 // Build-time variables set via ldflags (see .goreleaser.yml).
@@ -15,8 +16,9 @@ var (
 )
 
 func init() {
-	// Propagate build-time version to the API client package.
+	// Propagate build-time version to the API client and auth packages.
 	setAPIVersion(version)
+	auth.CLIVersion = version
 }
 
 var versionCmd = &cobra.Command{

@@ -11,6 +11,9 @@ linters:
     - gocritic
     - misspell
     - gofmt
+    - gosec
+    - bodyclose
+    - errorlint
 
 issues:
   exclude-dirs:

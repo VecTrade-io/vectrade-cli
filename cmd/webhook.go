@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -119,6 +120,7 @@ func streamWebhookEvents(cfg *config.Config) error {
 	defer body.Close()
 
 	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.HasPrefix(line, "data: ") {
@@ -140,9 +142,13 @@ func streamWebhookEvents(cfg *config.Config) error {
 
 func forwardEvent(targetURL, data string) {
 	// Only allow forwarding to localhost URLs to prevent SSRF
-	if !strings.HasPrefix(targetURL, "http://localhost") &&
-		!strings.HasPrefix(targetURL, "http://127.0.0.1") &&
-		!strings.HasPrefix(targetURL, "http://[::1]") {
+	parsed, err := url.Parse(targetURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  ⚠ Forward blocked: invalid URL\n")
+		return
+	}
+	hostname := parsed.Hostname()
+	if hostname != "localhost" && hostname != "127.0.0.1" && hostname != "::1" {
 		fmt.Fprintf(os.Stderr, "  ⚠ Forward blocked: only localhost URLs are allowed\n")
 		return
 	}
@@ -244,7 +250,7 @@ func runWebhookDelete(cmd *cobra.Command, args []string) error {
 	}
 
 	client := api.NewClient(cfg)
-	err = client.Delete(context.Background(), fmt.Sprintf("/vq/webhooks/%s", args[0]))
+	err = client.Delete(context.Background(), fmt.Sprintf("/vq/webhooks/%s", url.PathEscape(args[0])))
 	if err != nil {
 		return err
 	}

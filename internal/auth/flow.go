@@ -250,7 +250,10 @@ func RefreshAccessToken(baseURL string, creds *Credentials) (*Credentials, error
 	return creds, nil
 }
 
-// cliVersion returns the CLI version for User-Agent. Reads from api package at link time.
+// CLIVersion is set by the cmd package at init time to provide the version for User-Agent headers.
+var CLIVersion = "dev"
+
+// cliVersion returns the CLI version for User-Agent headers.
 func cliVersion() string {
-	return "dev" // Overridden by ldflags at build time
+	return CLIVersion
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"text/tabwriter"
 
@@ -136,7 +137,7 @@ func runKeysRevoke(cmd *cobra.Command, args []string) error {
 	}
 
 	client := api.NewClient(cfg)
-	err = client.Delete(context.Background(), fmt.Sprintf("/vq/keys/%s", args[0]))
+	err = client.Delete(context.Background(), fmt.Sprintf("/vq/keys/%s", url.PathEscape(args[0])))
 	if err != nil {
 		return err
 	}

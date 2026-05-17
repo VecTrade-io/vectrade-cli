@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -165,6 +166,55 @@ func TestSupportedProviders(t *testing.T) {
 		if !found {
 			t.Errorf("missing expected provider %q", p)
 		}
+	}
+}
+
+func TestCallbackServer_XSSPrevention(t *testing.T) {
+	srv, err := newCallbackServer()
+	if err != nil {
+		t.Fatalf("newCallbackServer: %v", err)
+	}
+	srv.Start()
+
+	port := srv.Port()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Inject XSS payload via error_description
+	xssPayload := "<script>alert('xss')</script>"
+	callbackURL := "http://127.0.0.1:" + itoa(port) + "/callback?error=test&error_description=" + xssPayload
+	resp, err := http.Get(callbackURL) //nolint:gosec // test-only localhost
+	if err != nil {
+		t.Fatalf("GET callback: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	htmlBody := string(body)
+
+	// The raw <script> tag must NOT appear in the HTML response
+	if strings.Contains(htmlBody, "<script>alert") {
+		t.Error("XSS: raw <script> tag found in error page — error_description not escaped")
+	}
+	// The escaped version should be present
+	if !strings.Contains(htmlBody, "&lt;script&gt;") {
+		t.Error("expected HTML-escaped script tag in response")
+	}
+
+	// Drain the result channel
+	_, _ = srv.WaitForCallback(ctx)
+}
+
+func TestCredentialsDir_ReturnsPath(t *testing.T) {
+	dir, err := CredentialsDir()
+	if err != nil {
+		t.Fatalf("CredentialsDir(): %v", err)
+	}
+	if dir == "" {
+		t.Error("CredentialsDir() returned empty string")
+	}
+	if !strings.Contains(dir, "vectrade") {
+		t.Errorf("CredentialsDir() = %q, expected path containing 'vectrade'", dir)
 	}
 }
 

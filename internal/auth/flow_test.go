@@ -156,3 +156,50 @@ func TestRefreshAccessToken_Failure(t *testing.T) {
 		t.Error("expected error for failed refresh")
 	}
 }
+
+func TestCLIVersion_Default(t *testing.T) {
+	// Default value should be "dev"
+	original := CLIVersion
+	defer func() { CLIVersion = original }()
+
+	CLIVersion = "dev"
+	if got := cliVersion(); got != "dev" {
+		t.Errorf("cliVersion() = %q, want %q", got, "dev")
+	}
+}
+
+func TestCLIVersion_Set(t *testing.T) {
+	original := CLIVersion
+	defer func() { CLIVersion = original }()
+
+	CLIVersion = "1.2.3"
+	if got := cliVersion(); got != "1.2.3" {
+		t.Errorf("cliVersion() = %q, want %q", got, "1.2.3")
+	}
+}
+
+func TestExchangeCode_UserAgent(t *testing.T) {
+	// Not parallel — mutates global CLIVersion
+
+	original := CLIVersion
+	defer func() { CLIVersion = original }()
+	CLIVersion = "0.5.0"
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ua := r.Header.Get("User-Agent")
+		if ua != "vectrade-cli/0.5.0" {
+			t.Errorf("User-Agent = %q, want %q", ua, "vectrade-cli/0.5.0")
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(tokenResponse{
+			Access:  "tok",
+			Refresh: "ref",
+		})
+	}))
+	defer srv.Close()
+
+	_, err := exchangeCode(context.Background(), srv.URL, "code", "state", 12345)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

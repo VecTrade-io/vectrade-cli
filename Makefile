@@ -3,7 +3,7 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 DATE    ?= $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
-LDFLAGS  = -s -w -X cmd.version=$(VERSION) -X cmd.commit=$(COMMIT) -X cmd.date=$(DATE)
+LDFLAGS  = -s -w -X github.com/VecTrade-io/vectrade-cli/cmd.version=$(VERSION) -X github.com/VecTrade-io/vectrade-cli/cmd.commit=$(COMMIT) -X github.com/VecTrade-io/vectrade-cli/cmd.date=$(DATE)
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o bin/vectrade .
