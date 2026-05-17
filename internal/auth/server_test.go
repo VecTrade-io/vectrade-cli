@@ -218,6 +218,85 @@ func TestCredentialsDir_ReturnsPath(t *testing.T) {
 	}
 }
 
+func TestCallbackServer_NonCallbackPath(t *testing.T) {
+	srv, err := newCallbackServer()
+	if err != nil {
+		t.Fatalf("newCallbackServer: %v", err)
+	}
+	srv.Start()
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = srv.server.Shutdown(ctx)
+	}()
+
+	port := srv.Port()
+	// Request a path that isn't /callback — should 404
+	resp, err := http.Get("http://127.0.0.1:" + itoa(port) + "/other") //nolint:gosec
+	if err != nil {
+		t.Fatalf("GET /other: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404 for /other, got %d", resp.StatusCode)
+	}
+}
+
+func TestCallbackServer_MultipleCallbacks(t *testing.T) {
+	srv, err := newCallbackServer()
+	if err != nil {
+		t.Fatalf("newCallbackServer: %v", err)
+	}
+	srv.Start()
+
+	port := srv.Port()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// First callback
+	resp, err := http.Get("http://127.0.0.1:" + itoa(port) + "/callback?code=first&state=s1") //nolint:gosec
+	if err != nil {
+		t.Fatalf("first callback: %v", err)
+	}
+	resp.Body.Close()
+
+	result, err := srv.WaitForCallback(ctx)
+	if err != nil {
+		t.Fatalf("WaitForCallback: %v", err)
+	}
+	if result.Code != "first" {
+		t.Errorf("expected 'first', got %q", result.Code)
+	}
+}
+
+func TestCallbackServer_SuccessPage_HTML(t *testing.T) {
+	srv, err := newCallbackServer()
+	if err != nil {
+		t.Fatalf("newCallbackServer: %v", err)
+	}
+	srv.Start()
+
+	port := srv.Port()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	resp, err := http.Get("http://127.0.0.1:" + itoa(port) + "/callback?code=test&state=s") //nolint:gosec
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	if ct := resp.Header.Get("Content-Type"); !strings.Contains(ct, "text/html") {
+		t.Errorf("expected text/html content-type, got %q", ct)
+	}
+	if !strings.Contains(string(body), "Authenticated") {
+		t.Error("success page should contain 'Authenticated'")
+	}
+
+	_, _ = srv.WaitForCallback(ctx)
+}
+
 // itoa is a simple int-to-string helper to avoid importing strconv.
 func itoa(n int) string {
 	if n == 0 {

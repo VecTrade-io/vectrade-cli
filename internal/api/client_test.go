@@ -422,3 +422,319 @@ func TestMaxResponseSizeConstant(t *testing.T) {
 		t.Errorf("maxResponseSize = %d, want %d (10MB)", maxResponseSize, expected)
 	}
 }
+
+func TestPost_ResponseSizeLimit(t *testing.T) {
+	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(strings.Repeat("y", maxResponseSize+512)))
+	})
+	defer srv.Close()
+
+	body, err := client.Post(context.Background(), "/large", map[string]string{"key": "val"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(body) > maxResponseSize {
+		t.Errorf("POST response %d bytes exceeds limit %d", len(body), maxResponseSize)
+	}
+}
+
+func TestDelete_ResponseSizeLimit(t *testing.T) {
+	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		// Large error response
+		w.Write([]byte(strings.Repeat("e", maxResponseSize+512)))
+	})
+	defer srv.Close()
+
+	err := client.Delete(context.Background(), "/large")
+	if err == nil {
+		t.Fatal("expected error for 500")
+	}
+}
+
+func TestStreamGet_ResponseSizeLimit(t *testing.T) {
+	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(strings.Repeat("z", maxResponseSize+100)))
+	})
+	defer srv.Close()
+
+	_, err := client.StreamGet(context.Background(), "/large")
+	if err == nil {
+		t.Fatal("expected error for 400")
+	}
+}
+
+func TestStreamPost_ResponseSizeLimit(t *testing.T) {
+	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(strings.Repeat("w", maxResponseSize+100)))
+	})
+	defer srv.Close()
+
+	_, err := client.StreamPost(context.Background(), "/large", map[string]string{"key": "val"})
+	if err == nil {
+		t.Fatal("expected error for 400")
+	}
+}
+
+func TestGet_NoParams(t *testing.T) {
+	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.RawQuery != "" {
+			t.Errorf("expected no query params, got %s", r.URL.RawQuery)
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"ok": true}`))
+	})
+	defer srv.Close()
+
+	_, err := client.Get(context.Background(), "/test", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestNewClient_UserAgent(t *testing.T) {
+	originalVersion := Version
+	defer func() { Version = originalVersion }()
+	Version = "1.5.0"
+
+	cfg := &config.Config{
+		APIKey:  "vq_test",
+		BaseURL: "https://api.vectrade.io/v1",
+		Timeout: 10,
+	}
+	client := NewClient(cfg)
+	if client.userAgent != "vectrade-cli/1.5.0" {
+		t.Errorf("userAgent = %q, want %q", client.userAgent, "vectrade-cli/1.5.0")
+	}
+}
+
+func TestNewClient_BaseURL(t *testing.T) {
+	cfg := &config.Config{
+		APIKey:  "vq_test",
+		BaseURL: "https://custom.api.io/v2",
+		Timeout: 30,
+	}
+	client := NewClient(cfg)
+	if client.baseURL != "https://custom.api.io/v2" {
+		t.Errorf("baseURL = %q, want %q", client.baseURL, "https://custom.api.io/v2")
+	}
+}
+
+func TestSetHeaders(t *testing.T) {
+	cfg := &config.Config{
+		APIKey:  "vq_test_headers",
+		BaseURL: "https://api.vectrade.io/v1",
+		Timeout: 10,
+	}
+	client := NewClient(cfg)
+
+	req, _ := http.NewRequest(http.MethodGet, "https://api.vectrade.io/v1/test", nil)
+	client.setHeaders(req)
+
+	if got := req.Header.Get("Authorization"); got != "Bearer vq_test_headers" {
+		t.Errorf("Authorization = %q", got)
+	}
+	if got := req.Header.Get("User-Agent"); !strings.HasPrefix(got, "vectrade-cli/") {
+		t.Errorf("User-Agent = %q, expected vectrade-cli/ prefix", got)
+	}
+	if got := req.Header.Get("Accept"); got != "application/json" {
+		t.Errorf("Accept = %q, want application/json", got)
+	}
+}
+
+func TestVersion_Default(t *testing.T) {
+	// Version should have a default
+	if Version == "" {
+		t.Error("Version should not be empty")
+	}
+}
+
+func TestAPIError_Error_EmptyType(t *testing.T) {
+	err := &APIError{StatusCode: 503, Type: "", Message: "unavailable"}
+	got := err.Error()
+	if !strings.Contains(got, "503") {
+		t.Errorf("expected 503 in error, got: %s", got)
+	}
+	if !strings.Contains(got, "unavailable") {
+		t.Errorf("expected 'unavailable' in error, got: %s", got)
+	}
+}
+
+func TestGet_ContextCanceled(t *testing.T) {
+	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	_, err := client.Get(ctx, "/test", nil)
+	if err == nil {
+		t.Error("expected error for canceled context")
+	}
+}
+
+func TestPost_ContextCanceled(t *testing.T) {
+	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := client.Post(ctx, "/test", map[string]string{"key": "val"})
+	if err == nil {
+		t.Error("expected error for canceled context")
+	}
+}
+
+func TestStreamGet_ContextCanceled(t *testing.T) {
+	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := client.StreamGet(ctx, "/test")
+	if err == nil {
+		t.Error("expected error for canceled context")
+	}
+}
+
+func TestStreamPost_ContextCanceled(t *testing.T) {
+	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := client.StreamPost(ctx, "/test", map[string]string{"key": "val"})
+	if err == nil {
+		t.Error("expected error for canceled context")
+	}
+}
+
+func TestDelete_ContextCanceled(t *testing.T) {
+	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := client.Delete(ctx, "/test")
+	if err == nil {
+		t.Error("expected error for canceled context")
+	}
+}
+
+func TestPost_MarshalError(t *testing.T) {
+	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	defer srv.Close()
+
+	// Channel values can't be marshaled to JSON
+	_, err := client.Post(context.Background(), "/test", make(chan int))
+	if err == nil {
+		t.Error("expected marshal error")
+	}
+	if !strings.Contains(err.Error(), "marshaling") {
+		t.Errorf("expected marshaling error, got: %v", err)
+	}
+}
+
+func TestStreamPost_MarshalError(t *testing.T) {
+	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	defer srv.Close()
+
+	_, err := client.StreamPost(context.Background(), "/test", make(chan int))
+	if err == nil {
+		t.Error("expected marshal error")
+	}
+}
+
+func TestStreamGet_Success_ReturnsBody(t *testing.T) {
+	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("data: hello\n\n"))
+	})
+	defer srv.Close()
+
+	body, err := client.StreamGet(context.Background(), "/stream")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer body.Close()
+
+	buf := make([]byte, 100)
+	n, _ := body.Read(buf)
+	if !strings.Contains(string(buf[:n]), "hello") {
+		t.Errorf("expected 'hello' in stream, got: %s", string(buf[:n]))
+	}
+}
+
+func TestStreamPost_Success_ReturnsBody(t *testing.T) {
+	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("data: world\n\n"))
+	})
+	defer srv.Close()
+
+	body, err := client.StreamPost(context.Background(), "/stream", map[string]string{"q": "test"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer body.Close()
+
+	buf := make([]byte, 100)
+	n, _ := body.Read(buf)
+	if !strings.Contains(string(buf[:n]), "world") {
+		t.Errorf("expected 'world' in stream, got: %s", string(buf[:n]))
+	}
+}
+
+func TestDelete_Success_NoContent(t *testing.T) {
+	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent) // 204
+	})
+	defer srv.Close()
+
+	err := client.Delete(context.Background(), "/items/123")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseAPIError_WithRequestID(t *testing.T) {
+	body := `{"error":{"type":"rate_limit","message":"too many requests"},"request_id":"req_abc"}`
+	err := parseAPIError(429, []byte(body))
+	apiErr, ok := err.(*APIError)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if apiErr.RequestID != "req_abc" {
+		t.Errorf("RequestID = %q", apiErr.RequestID)
+	}
+	errStr := apiErr.Error()
+	if !strings.Contains(errStr, "req_abc") {
+		t.Errorf("error string missing request_id: %s", errStr)
+	}
+	if !strings.Contains(errStr, "rate_limit") {
+		t.Errorf("error string missing type: %s", errStr)
+	}
+}

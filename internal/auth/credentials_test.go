@@ -178,3 +178,227 @@ func TestCredentials_JSONRoundTrip(t *testing.T) {
 		t.Errorf("ExpiresAt mismatch: got %v, want %v", decoded.ExpiresAt, original.ExpiresAt)
 	}
 }
+
+func TestSaveCredentials_CreatesDirectoryAndFile(t *testing.T) {
+	tmp := t.TempDir()
+	// Override HOME so CredentialsDir resolves under tmp
+	t.Setenv("HOME", tmp)
+
+	creds := &Credentials{
+		AccessToken:  "at_save_test",
+		RefreshToken: "rt_save_test",
+		SessionID:    "sess_save",
+		ExpiresAt:    time.Now().Add(1 * time.Hour).Truncate(time.Second),
+		Provider:     "google",
+		BaseURL:      "https://api.vectrade.io/v1",
+	}
+
+	if err := SaveCredentials(creds); err != nil {
+		t.Fatalf("SaveCredentials: %v", err)
+	}
+
+	// Verify file exists
+	path, _ := credentialsPath()
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("credentials file not created: %v", err)
+	}
+	// Verify permissions are 0600
+	if perm := info.Mode().Perm(); perm != 0600 {
+		t.Errorf("permissions = %o, want 0600", perm)
+	}
+
+	// Verify content
+	data, _ := os.ReadFile(path)
+	var loaded Credentials
+	if err := json.Unmarshal(data, &loaded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if loaded.AccessToken != "at_save_test" {
+		t.Errorf("AccessToken = %q, want %q", loaded.AccessToken, "at_save_test")
+	}
+}
+
+func TestLoadCredentials_ReturnsNilWhenNoFile(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	creds, err := LoadCredentials()
+	if err != nil {
+		t.Fatalf("LoadCredentials: %v", err)
+	}
+	if creds != nil {
+		t.Errorf("expected nil credentials, got %+v", creds)
+	}
+}
+
+func TestLoadCredentials_ReadsFile(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	original := &Credentials{
+		AccessToken:  "at_load_test",
+		RefreshToken: "rt_load_test",
+		SessionID:    "sess_load",
+		ExpiresAt:    time.Date(2025, 12, 1, 0, 0, 0, 0, time.UTC),
+		Provider:     "microsoft",
+		BaseURL:      "https://api.vectrade.io/v1",
+	}
+
+	// Save first
+	if err := SaveCredentials(original); err != nil {
+		t.Fatalf("SaveCredentials: %v", err)
+	}
+
+	// Load
+	loaded, err := LoadCredentials()
+	if err != nil {
+		t.Fatalf("LoadCredentials: %v", err)
+	}
+	if loaded == nil {
+		t.Fatal("expected credentials, got nil")
+	}
+	if loaded.AccessToken != "at_load_test" {
+		t.Errorf("AccessToken = %q, want %q", loaded.AccessToken, "at_load_test")
+	}
+	if loaded.Provider != "microsoft" {
+		t.Errorf("Provider = %q, want %q", loaded.Provider, "microsoft")
+	}
+	if !loaded.ExpiresAt.Equal(original.ExpiresAt) {
+		t.Errorf("ExpiresAt mismatch")
+	}
+}
+
+func TestLoadCredentials_InvalidJSON(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	// Create credentials file with invalid JSON at the platform-specific path
+	dir, _ := CredentialsDir()
+	os.MkdirAll(dir, 0700)
+	os.WriteFile(filepath.Join(dir, "credentials.json"), []byte("not valid json{"), 0600)
+
+	_, err := LoadCredentials()
+	if err == nil {
+		t.Error("expected error for invalid JSON")
+	}
+}
+
+func TestClearCredentials_RemovesFile(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	// Save credentials first
+	creds := &Credentials{AccessToken: "at_clear", Provider: "google", BaseURL: "https://api.vectrade.io/v1"}
+	if err := SaveCredentials(creds); err != nil {
+		t.Fatalf("SaveCredentials: %v", err)
+	}
+
+	// Verify file exists
+	path, _ := credentialsPath()
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("file should exist: %v", err)
+	}
+
+	// Clear
+	if err := ClearCredentials(); err != nil {
+		t.Fatalf("ClearCredentials: %v", err)
+	}
+
+	// Verify file is gone
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Error("credentials file should have been removed")
+	}
+}
+
+func TestClearCredentials_NoFileIsOK(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	// Ensure dir exists but no creds file
+	dir, _ := CredentialsDir()
+	os.MkdirAll(dir, 0700)
+
+	if err := ClearCredentials(); err != nil {
+		t.Errorf("ClearCredentials with no file should succeed: %v", err)
+	}
+}
+
+func TestCredentialsDir_ContainsVectrade(t *testing.T) {
+	dir, err := CredentialsDir()
+	if err != nil {
+		t.Fatalf("CredentialsDir: %v", err)
+	}
+	if !filepath.IsAbs(dir) {
+		t.Errorf("expected absolute path, got %q", dir)
+	}
+	if !filepath.IsAbs(dir) || dir == "" {
+		t.Errorf("CredentialsDir() = %q, expected non-empty absolute path", dir)
+	}
+}
+
+func TestCredentialsPath_EndsWithJSON(t *testing.T) {
+	path, err := credentialsPath()
+	if err != nil {
+		t.Fatalf("credentialsPath: %v", err)
+	}
+	if filepath.Base(path) != "credentials.json" {
+		t.Errorf("expected credentials.json, got %q", filepath.Base(path))
+	}
+}
+
+func TestSaveAndLoadCredentials_FullCycle(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	original := &Credentials{
+		AccessToken:  "cycle_at",
+		RefreshToken: "cycle_rt",
+		SessionID:    "cycle_sess",
+		ExpiresAt:    time.Now().Add(2 * time.Hour).Truncate(time.Second),
+		Provider:     "apple",
+		BaseURL:      "https://sandbox.api.vectrade.io/v1",
+	}
+
+	// Save
+	if err := SaveCredentials(original); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	// Load
+	loaded, err := LoadCredentials()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	// Verify all fields
+	if loaded.AccessToken != original.AccessToken {
+		t.Errorf("AccessToken mismatch")
+	}
+	if loaded.RefreshToken != original.RefreshToken {
+		t.Errorf("RefreshToken mismatch")
+	}
+	if loaded.SessionID != original.SessionID {
+		t.Errorf("SessionID mismatch")
+	}
+	if loaded.Provider != original.Provider {
+		t.Errorf("Provider mismatch")
+	}
+	if loaded.BaseURL != original.BaseURL {
+		t.Errorf("BaseURL mismatch")
+	}
+
+	// Clear
+	if err := ClearCredentials(); err != nil {
+		t.Fatalf("clear: %v", err)
+	}
+
+	// Verify gone
+	afterClear, err := LoadCredentials()
+	if err != nil {
+		t.Fatalf("load after clear: %v", err)
+	}
+	if afterClear != nil {
+		t.Error("expected nil after clear")
+	}
+}

@@ -3,6 +3,7 @@ package output
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -163,5 +164,23 @@ func TestTable_RenderCSV_SpecialChars(t *testing.T) {
 	// CSV should properly escape these
 	if !strings.Contains(buf.String(), "\"field,with,commas\"") {
 		t.Error("CSV should quote fields containing commas")
+	}
+}
+
+type errWriter struct{}
+
+func (e *errWriter) Write(p []byte) (int, error) {
+	return 0, fmt.Errorf("write error")
+}
+
+func TestTable_RenderCSV_WriteError(t *testing.T) {
+	t.Parallel()
+	tbl := NewTable("A", "B")
+	tbl.AddRow("1", "2")
+
+	w := &errWriter{}
+	err := tbl.Render(w, FormatCSV)
+	if err == nil {
+		t.Error("expected write error")
 	}
 }
