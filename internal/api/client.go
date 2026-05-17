@@ -168,8 +168,8 @@ func (c *Client) StreamPost(ctx context.Context, path string, payload any) (io.R
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "text/event-stream")
 	c.setHeaders(req)
+	req.Header.Set("Accept", "text/event-stream")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

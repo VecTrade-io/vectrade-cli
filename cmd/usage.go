@@ -23,7 +23,6 @@ var usageThisMonth bool
 
 func init() {
 	usageCmd.Flags().BoolVar(&usageThisMonth, "this-month", true, "show current billing month")
-	rootCmd.AddCommand(usageCmd)
 }
 
 type usageResponse struct {

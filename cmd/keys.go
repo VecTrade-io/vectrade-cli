@@ -46,7 +46,6 @@ func init() {
 	keysCmd.AddCommand(keysCreateCmd)
 	keysCmd.AddCommand(keysListCmd)
 	keysCmd.AddCommand(keysRevokeCmd)
-	rootCmd.AddCommand(keysCmd)
 }
 
 type keyCreateResponse struct {

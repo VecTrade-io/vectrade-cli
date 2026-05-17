@@ -23,7 +23,6 @@ var mcpSetupCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(mcpCmd)
 	mcpCmd.AddCommand(mcpSetupCmd)
 }
 

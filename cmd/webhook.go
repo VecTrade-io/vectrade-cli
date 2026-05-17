@@ -70,7 +70,6 @@ func init() {
 	webhookCmd.AddCommand(webhookListCmd)
 	webhookCmd.AddCommand(webhookCreateCmd)
 	webhookCmd.AddCommand(webhookDeleteCmd)
-	rootCmd.AddCommand(webhookCmd)
 }
 
 type webhookEntry struct {

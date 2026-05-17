@@ -42,7 +42,6 @@ func init() {
 
 	openapiCmd.AddCommand(openapiDownloadCmd)
 	openapiCmd.AddCommand(openapiDiffCmd)
-	rootCmd.AddCommand(openapiCmd)
 }
 
 func runOpenapiDownload(cmd *cobra.Command, args []string) error {
@@ -57,11 +56,12 @@ func runOpenapiDownload(cmd *cobra.Command, args []string) error {
 	client := api.NewClient(cfg)
 
 	specPath := "/vq/openapi"
+	var specParams map[string]string
 	if openapiVersion != "latest" {
-		specPath = fmt.Sprintf("/vq/openapi?version=%s", openapiVersion)
+		specParams = map[string]string{"version": openapiVersion}
 	}
 
-	body, err := client.Get(context.Background(), specPath, nil)
+	body, err := client.Get(context.Background(), specPath, specParams)
 	if err != nil {
 		return fmt.Errorf("downloading spec: %w", err)
 	}
