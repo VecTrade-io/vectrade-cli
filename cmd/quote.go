@@ -32,6 +32,9 @@ func runQuote(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	if outputFmt != "" {
+		cfg.Output = outputFmt
+	}
 	if err := cfg.Validate(); err != nil {
 		return err
 	}

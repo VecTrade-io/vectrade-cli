@@ -5,9 +5,10 @@ import (
 )
 
 var (
-	cfgFile string
-	apiKey  string
-	sandbox bool
+	cfgFile   string
+	apiKey    string
+	sandbox   bool
+	outputFmt string
 )
 
 var rootCmd = &cobra.Command{
@@ -34,6 +35,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default $HOME/.vectrade/config.yaml)")
 	rootCmd.PersistentFlags().StringVar(&apiKey, "api-key", "", "API key (overrides config/env)")
 	rootCmd.PersistentFlags().BoolVar(&sandbox, "sandbox", false, "use sandbox environment")
+	rootCmd.PersistentFlags().StringVarP(&outputFmt, "output", "o", "", "output format: table, json, csv")
 
 	rootCmd.AddCommand(quoteCmd)
 	rootCmd.AddCommand(aiCmd)
