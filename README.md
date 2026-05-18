@@ -76,6 +76,13 @@ After `vectrade auth login`, JWT tokens are stored with owner-only permissions:
 | Linux | `~/.config/vectrade/credentials.json` |
 | Windows | `%APPDATA%/vectrade/credentials.json` |
 
+## Documentation
+
+Full documentation is available at [docs.vectrade.io/sdks/cli](https://docs.vectrade.io/sdks/cli).
+
+- [API Reference](https://docs.vectrade.io/api-reference/overview)
+- [All SDKs](https://docs.vectrade.io/sdks/python)
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
