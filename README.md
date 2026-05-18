@@ -1,6 +1,6 @@
 # VecTrade CLI
 
-[![License](https://img.shields.io/github/license/VecTrade-io/vectrade-cli)](LICENSE) [![Go](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://go.dev/)
+[![License](https://img.shields.io/github/license/VecTrade-io/vectrade-cli)](LICENSE) [![Go](https://img.shields.io/badge/go-1.22+-00ADD8.svg)](https://go.dev/)
 
 Cross-platform CLI for VecTrade financial data and AI analysis.
 

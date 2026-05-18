@@ -27,9 +27,10 @@ var SupportedProviders = []string{"google", "microsoft", "apple", "x"}
 
 // LoginOptions configures the browser-based OAuth login flow.
 type LoginOptions struct {
-	Provider string // OAuth provider name (google, microsoft, apple, x)
-	BaseURL  string // API base URL (e.g. https://api.vectrade.io/v1)
-	Timeout  time.Duration
+	Provider      string // OAuth provider name (google, microsoft, apple, x)
+	BaseURL       string // API base URL (e.g. https://api.vectrade.io/v1)
+	Timeout       time.Duration
+	BrowserOpener func(url string) error // Optional; defaults to openBrowser
 }
 
 // tokenResponse mirrors the backend's OAuthTokenResponse.
@@ -79,7 +80,11 @@ func Login(opts LoginOptions) (*Credentials, error) {
 
 	// 3. Open browser
 	fmt.Println("  ▸ Opening browser for authentication...")
-	if err := openBrowser(authURL); err != nil {
+	opener := opts.BrowserOpener
+	if opener == nil {
+		opener = openBrowser
+	}
+	if err := opener(authURL); err != nil {
 		// Fall back to manual URL
 		fmt.Printf("\n  Could not open browser automatically.\n  Open this URL in your browser:\n\n    %s\n\n", authURL)
 	}
@@ -250,7 +255,10 @@ func RefreshAccessToken(baseURL string, creds *Credentials) (*Credentials, error
 	return creds, nil
 }
 
-// cliVersion returns the CLI version for User-Agent. Reads from api package at link time.
+// CLIVersion is set by the cmd package at init time to provide the version for User-Agent headers.
+var CLIVersion = "dev"
+
+// cliVersion returns the CLI version for User-Agent headers.
 func cliVersion() string {
-	return "dev" // Overridden by ldflags at build time
+	return CLIVersion
 }

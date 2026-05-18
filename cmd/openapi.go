@@ -42,14 +42,10 @@ func init() {
 
 	openapiCmd.AddCommand(openapiDownloadCmd)
 	openapiCmd.AddCommand(openapiDiffCmd)
-	rootCmd.AddCommand(openapiCmd)
 }
 
 func runOpenapiDownload(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load(apiKey, sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load(apiKey, sandbox, cfgFile)
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
@@ -57,11 +53,12 @@ func runOpenapiDownload(cmd *cobra.Command, args []string) error {
 	client := api.NewClient(cfg)
 
 	specPath := "/vq/openapi"
+	var specParams map[string]string
 	if openapiVersion != "latest" {
-		specPath = fmt.Sprintf("/vq/openapi?version=%s", openapiVersion)
+		specParams = map[string]string{"version": openapiVersion}
 	}
 
-	body, err := client.Get(context.Background(), specPath, nil)
+	body, err := client.Get(context.Background(), specPath, specParams)
 	if err != nil {
 		return fmt.Errorf("downloading spec: %w", err)
 	}
@@ -75,7 +72,19 @@ func runOpenapiDownload(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("getting working directory: %w", err)
 	}
-	if !strings.HasPrefix(absOutput, cwd) {
+	// Resolve symlinks for both paths to prevent symlink-based path traversal
+	absOutput, err = filepath.EvalSymlinks(filepath.Dir(absOutput))
+	if err != nil {
+		// If parent dir doesn't exist yet, fallback to Abs check
+		absOutput, _ = filepath.Abs(openapiOutput)
+	} else {
+		absOutput = filepath.Join(absOutput, filepath.Base(openapiOutput))
+	}
+	cwdResolved, err := filepath.EvalSymlinks(cwd)
+	if err != nil {
+		cwdResolved = cwd
+	}
+	if !strings.HasPrefix(absOutput, cwdResolved) {
 		return fmt.Errorf("output path must be within current directory (got %s)", absOutput)
 	}
 
@@ -97,10 +106,7 @@ func runOpenapiDownload(cmd *cobra.Command, args []string) error {
 }
 
 func runOpenapiDiff(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load(apiKey, sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load(apiKey, sandbox, cfgFile)
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
@@ -108,7 +114,7 @@ func runOpenapiDiff(cmd *cobra.Command, args []string) error {
 	// Check if local file exists
 	localPath := openapiOutput
 	if _, err := os.Stat(localPath); os.IsNotExist(err) {
-		return fmt.Errorf("local spec not found at %s — run 'vt openapi download' first", localPath)
+		return fmt.Errorf("local spec not found at %s — run 'vectrade openapi download' first", localPath)
 	}
 
 	client := api.NewClient(cfg)
@@ -128,6 +134,6 @@ func runOpenapiDiff(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Fprintf(os.Stdout, "⚠ Spec has changed (local: %d bytes, remote: %d bytes)\n", len(localBody), len(remoteBody))
-	fmt.Fprintln(os.Stdout, "  Run 'vt openapi download' to update.")
+	fmt.Fprintln(os.Stdout, "  Run 'vectrade openapi download' to update.")
 	return nil
 }

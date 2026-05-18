@@ -6,9 +6,9 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
+	"github.com/VecTrade-io/vectrade-cli/internal/auth"
 	"gopkg.in/yaml.v3"
 )
 
@@ -44,14 +44,14 @@ type Config struct {
 }
 
 // ErrNoAPIKey is returned when no API key can be resolved.
-var ErrNoAPIKey = errors.New("no API key configured. Run 'vt auth login' or set VECTRADE_API_KEY")
+var ErrNoAPIKey = errors.New("no API key configured. Run 'vectrade auth login' or set VECTRADE_API_KEY")
 
 // Load resolves configuration from (in priority order):
 // 1. Explicit flags (apiKey, sandbox)
 // 2. Environment variables
 // 3. Config file (~/.vectrade/config.yaml)
 // 4. Defaults
-func Load(flagAPIKey string, flagSandbox bool, configPath string) (*Config, error) {
+func Load(flagAPIKey string, flagSandbox bool, configPath string) *Config {
 	cfg := &Config{
 		BaseURL: DefaultBaseURL,
 		Timeout: DefaultTimeout,
@@ -100,7 +100,7 @@ func Load(flagAPIKey string, flagSandbox bool, configPath string) (*Config, erro
 		}
 	}
 
-	return cfg, nil
+	return cfg
 }
 
 // Validate checks that required configuration is present.
@@ -140,7 +140,7 @@ func isTruthy(val string) bool {
 // loadStoredJWT reads the JWT access token from stored credentials.
 // Returns empty string if no credentials are stored.
 func loadStoredJWT() (string, error) {
-	dir, err := credentialDir()
+	dir, err := auth.CredentialsDir()
 	if err != nil {
 		return "", err
 	}
@@ -156,31 +156,4 @@ func loadStoredJWT() (string, error) {
 		return "", err
 	}
 	return creds.AccessToken, nil
-}
-
-// credentialDir returns the platform-specific directory for VecTrade credentials.
-func credentialDir() (string, error) {
-	switch runtime.GOOS {
-	case "darwin":
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
-		}
-		return filepath.Join(home, "Library", "Application Support", "vectrade"), nil
-	case "windows":
-		appData := os.Getenv("APPDATA")
-		if appData == "" {
-			return "", errors.New("APPDATA not set")
-		}
-		return filepath.Join(appData, "vectrade"), nil
-	default:
-		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-			return filepath.Join(xdg, "vectrade"), nil
-		}
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
-		}
-		return filepath.Join(home, ".config", "vectrade"), nil
-	}
 }

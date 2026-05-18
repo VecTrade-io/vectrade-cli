@@ -28,10 +28,7 @@ func init() {
 func runQuote(cmd *cobra.Command, args []string) error {
 	symbol := args[0]
 
-	cfg, err := config.Load(apiKey, sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load(apiKey, sandbox, cfgFile)
 	if outputFmt != "" {
 		cfg.Output = outputFmt
 	}

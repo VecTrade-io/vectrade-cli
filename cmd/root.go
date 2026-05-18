@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/VecTrade-io/vectrade-cli/internal/api"
 )
 
 var (
@@ -10,6 +11,11 @@ var (
 	sandbox   bool
 	outputFmt string
 )
+
+// setAPIVersion propagates the build-time version to the API client package.
+func setAPIVersion(v string) {
+	api.Version = v
+}
 
 var rootCmd = &cobra.Command{
 	Use:   "vectrade",
@@ -21,6 +27,7 @@ Get started:
   vectrade auth login
   vectrade quote AAPL
   vectrade ai "Analyze MSFT earnings"`,
+	SilenceUsage: true,
 }
 
 func Execute() error {

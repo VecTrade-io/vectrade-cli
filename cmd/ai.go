@@ -23,10 +23,7 @@ var aiCmd = &cobra.Command{
 func runAI(cmd *cobra.Command, args []string) error {
 	prompt := args[0]
 
-	cfg, err := config.Load(apiKey, sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load(apiKey, sandbox, cfgFile)
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
@@ -43,6 +40,7 @@ func runAI(cmd *cobra.Command, args []string) error {
 	defer body.Close()
 
 	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "data: ") {

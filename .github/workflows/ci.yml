@@ -7,6 +7,17 @@ on:
     branches: [main]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64.5
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -15,7 +26,15 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go vet ./...
-      - run: go test -race -v ./...
+      - run: go test -race -coverprofile=coverage.out -v ./...
+      - name: Check coverage
+        run: |
+          total=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
+          echo "Total coverage: ${total}%"
+          if (( $(echo "$total < 60" | bc -l) )); then
+            echo "::error::Coverage ${total}% is below 60% threshold"
+            exit 1
+          fi
 
   build:
     runs-on: ubuntu-latest

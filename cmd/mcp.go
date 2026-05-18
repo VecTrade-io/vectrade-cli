@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/spf13/cobra"
 )
@@ -23,7 +22,6 @@ var mcpSetupCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(mcpCmd)
 	mcpCmd.AddCommand(mcpSetupCmd)
 }
 
@@ -88,23 +86,9 @@ func getMCPConfigPath(ide string) (dir string, filename string, err error) {
 	case "cursor":
 		return filepath.Join(home, ".cursor"), "mcp.json", nil
 	case "vscode":
-		switch runtime.GOOS {
-		case "windows":
-			return filepath.Join(os.Getenv("APPDATA"), "Code", "User"), "settings.json", nil
-		case "darwin":
-			return filepath.Join(home, "Library", "Application Support", "Code", "User"), "settings.json", nil
-		default:
-			return filepath.Join(home, ".config", "Code", "User"), "settings.json", nil
-		}
+		return mcpVSCodePath(home)
 	case "claude":
-		switch runtime.GOOS {
-		case "darwin":
-			return filepath.Join(home, "Library", "Application Support", "Claude"), "claude_desktop_config.json", nil
-		case "windows":
-			return filepath.Join(os.Getenv("APPDATA"), "Claude"), "claude_desktop_config.json", nil
-		default:
-			return filepath.Join(home, ".config", "claude"), "claude_desktop_config.json", nil
-		}
+		return mcpClaudePath(home)
 	case "windsurf":
 		return filepath.Join(home, ".windsurf"), "mcp.json", nil
 	case "cline":

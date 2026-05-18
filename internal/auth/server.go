@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"html"
 	"net"
 	"net/http"
 	"sync"
@@ -101,7 +102,7 @@ func (s *callbackServer) handleCallback(w http.ResponseWriter, r *http.Request) 
 
 		w.Header().Set(hdrCT, contentTypeHTML)
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, authErrorPage, errDesc)
+		fmt.Fprintf(w, authErrorPage, html.EscapeString(errDesc))
 		return
 	}
 

@@ -14,6 +14,9 @@ import (
 	"github.com/VecTrade-io/vectrade-cli/internal/config"
 )
 
+// maxResponseSize is the maximum allowed response body size (10MB).
+const maxResponseSize = 10 * 1024 * 1024
+
 // Client is the VecTrade API HTTP client.
 type Client struct {
 	baseURL    string
@@ -89,7 +92,7 @@ func (c *Client) Get(ctx context.Context, path string, params map[string]string)
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize))
 	if err != nil {
 		return nil, fmt.Errorf("reading response: %w", err)
 	}
@@ -121,7 +124,7 @@ func (c *Client) Post(ctx context.Context, path string, payload any) ([]byte, er
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize))
 	if err != nil {
 		return nil, fmt.Errorf("reading response: %w", err)
 	}
@@ -148,7 +151,7 @@ func (c *Client) StreamGet(ctx context.Context, path string) (io.ReadCloser, err
 	}
 
 	if resp.StatusCode >= 400 {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize))
 		resp.Body.Close()
 		return nil, parseAPIError(resp.StatusCode, body)
 	}
@@ -168,8 +171,8 @@ func (c *Client) StreamPost(ctx context.Context, path string, payload any) (io.R
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "text/event-stream")
 	c.setHeaders(req)
+	req.Header.Set("Accept", "text/event-stream")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -177,7 +180,7 @@ func (c *Client) StreamPost(ctx context.Context, path string, payload any) (io.R
 	}
 
 	if resp.StatusCode >= 400 {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize))
 		resp.Body.Close()
 		return nil, parseAPIError(resp.StatusCode, body)
 	}
@@ -206,7 +209,7 @@ func (c *Client) Delete(ctx context.Context, path string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize))
 		return parseAPIError(resp.StatusCode, body)
 	}
 

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -70,7 +71,6 @@ func init() {
 	webhookCmd.AddCommand(webhookListCmd)
 	webhookCmd.AddCommand(webhookCreateCmd)
 	webhookCmd.AddCommand(webhookDeleteCmd)
-	rootCmd.AddCommand(webhookCmd)
 }
 
 type webhookEntry struct {
@@ -82,10 +82,7 @@ type webhookEntry struct {
 }
 
 func runWebhookListen(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load(apiKey, sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load(apiKey, sandbox, cfgFile)
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
@@ -112,21 +109,15 @@ func runWebhookListen(cmd *cobra.Command, args []string) error {
 }
 
 func streamWebhookEvents(cfg *config.Config) error {
-	req, err := http.NewRequest("GET", cfg.BaseURL+"/vq/webhooks/listen", nil)
+	client := api.NewClient(cfg)
+	body, err := client.StreamGet(context.Background(), "/vq/webhooks/listen")
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
-	req.Header.Set("Accept", "text/event-stream")
+	defer body.Close()
 
-	httpClient := &http.Client{Timeout: 0}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	scanner := bufio.NewScanner(resp.Body)
+	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.HasPrefix(line, "data: ") {
@@ -138,7 +129,7 @@ func streamWebhookEvents(cfg *config.Config) error {
 				fmt.Fprintf(os.Stdout, "[%s] %s → %s\n", timestamp, eventType, data)
 
 				if listenForward != "" {
-					go forwardEvent(data)
+					go forwardEvent(listenForward, data)
 				}
 			}
 		}
@@ -146,8 +137,30 @@ func streamWebhookEvents(cfg *config.Config) error {
 	return scanner.Err()
 }
 
-func forwardEvent(data string) {
-	resp, err := http.Post(listenForward, "application/json", strings.NewReader(data))
+func forwardEvent(targetURL, data string) {
+	// Only allow forwarding to localhost URLs to prevent SSRF
+	parsed, err := url.Parse(targetURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  ⚠ Forward blocked: invalid URL\n")
+		return
+	}
+	hostname := parsed.Hostname()
+	if hostname != "localhost" && hostname != "127.0.0.1" && hostname != "::1" {
+		fmt.Fprintf(os.Stderr, "  ⚠ Forward blocked: only localhost URLs are allowed\n")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, targetURL, strings.NewReader(data))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  ⚠ Forward failed: %v\n", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "  ⚠ Forward failed: %v\n", err)
 		return
@@ -157,10 +170,7 @@ func forwardEvent(data string) {
 }
 
 func runWebhookList(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load(apiKey, sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load(apiKey, sandbox, cfgFile)
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
@@ -195,10 +205,7 @@ func runWebhookList(cmd *cobra.Command, args []string) error {
 }
 
 func runWebhookCreate(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load(apiKey, sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load(apiKey, sandbox, cfgFile)
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
@@ -225,16 +232,13 @@ func runWebhookCreate(cmd *cobra.Command, args []string) error {
 }
 
 func runWebhookDelete(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load(apiKey, sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load(apiKey, sandbox, cfgFile)
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
 
 	client := api.NewClient(cfg)
-	err = client.Delete(context.Background(), fmt.Sprintf("/vq/webhooks/%s", args[0]))
+	err := client.Delete(context.Background(), fmt.Sprintf("/vq/webhooks/%s", url.PathEscape(args[0])))
 	if err != nil {
 		return err
 	}

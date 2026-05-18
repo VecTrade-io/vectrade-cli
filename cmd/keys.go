@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"text/tabwriter"
 
@@ -46,7 +47,6 @@ func init() {
 	keysCmd.AddCommand(keysCreateCmd)
 	keysCmd.AddCommand(keysListCmd)
 	keysCmd.AddCommand(keysRevokeCmd)
-	rootCmd.AddCommand(keysCmd)
 }
 
 type keyCreateResponse struct {
@@ -65,10 +65,7 @@ type keyEntry struct {
 }
 
 func runKeysCreate(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load(apiKey, sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load(apiKey, sandbox, cfgFile)
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
@@ -93,10 +90,7 @@ func runKeysCreate(cmd *cobra.Command, args []string) error {
 }
 
 func runKeysList(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load(apiKey, sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load(apiKey, sandbox, cfgFile)
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
@@ -128,16 +122,13 @@ func runKeysList(cmd *cobra.Command, args []string) error {
 }
 
 func runKeysRevoke(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load(apiKey, sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load(apiKey, sandbox, cfgFile)
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
 
 	client := api.NewClient(cfg)
-	err = client.Delete(context.Background(), fmt.Sprintf("/vq/keys/%s", args[0]))
+	err := client.Delete(context.Background(), fmt.Sprintf("/vq/keys/%s", url.PathEscape(args[0])))
 	if err != nil {
 		return err
 	}

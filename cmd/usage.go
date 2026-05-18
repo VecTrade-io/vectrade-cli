@@ -23,7 +23,6 @@ var usageThisMonth bool
 
 func init() {
 	usageCmd.Flags().BoolVar(&usageThisMonth, "this-month", true, "show current billing month")
-	rootCmd.AddCommand(usageCmd)
 }
 
 type usageResponse struct {
@@ -43,10 +42,7 @@ type endpointUsage struct {
 }
 
 func runUsage(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load(apiKey, sandbox, cfgFile)
-	if err != nil {
-		return err
-	}
+	cfg := config.Load(apiKey, sandbox, cfgFile)
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
@@ -64,8 +60,13 @@ func runUsage(cmd *cobra.Command, args []string) error {
 
 	fmt.Fprintf(os.Stdout, "Plan: %s | Period: %s\n\n", result.PlanName, result.Period)
 
-	requestsPct := float64(result.RequestsUsed) / float64(result.RequestsLimit) * 100
-	creditsPct := result.CreditsUsed / result.CreditsLimit * 100
+	var requestsPct, creditsPct float64
+	if result.RequestsLimit > 0 {
+		requestsPct = float64(result.RequestsUsed) / float64(result.RequestsLimit) * 100
+	}
+	if result.CreditsLimit > 0 {
+		creditsPct = result.CreditsUsed / result.CreditsLimit * 100
+	}
 
 	fmt.Fprintf(os.Stdout, "Requests:  %d / %d (%.1f%%)\n", result.RequestsUsed, result.RequestsLimit, requestsPct)
 	fmt.Fprintf(os.Stdout, "Credits:   %.2f / %.2f (%.1f%%)\n\n", result.CreditsUsed, result.CreditsLimit, creditsPct)
