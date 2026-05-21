@@ -1,1 +1,22 @@
-* @VecTrade-io/cli-maintainers
+# ─── CODEOWNERS ─────────────────────────────────────────────────────────────
+# Maps file patterns to owners/agents responsible for review.
+
+# ── Default ─────────────────────────────────────────────────────────────────
+*                           @mountek
+
+# ── CI / DevOps ─────────────────────────────────────────────────────────────
+.github/workflows/          @mountek
+Dockerfile                  @mountek
+Makefile                    @mountek
+
+# ── CLI source (vt-cli-dev) ─────────────────────────────────────────────────
+cmd/                        @mountek
+internal/                   @mountek
+main.go                     @mountek
+
+# ── Completions ─────────────────────────────────────────────────────────────
+completions/                @mountek
+
+# ── Dependencies ────────────────────────────────────────────────────────────
+go.mod                      @mountek
+go.sum                      @mountek
