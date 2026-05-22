@@ -831,6 +831,7 @@ func TestAuthLogoutCmd_NotAuthenticated(t *testing.T) {
 	// Set XDG to temp dir so no credentials exist
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, ".config"))
 
 	old := os.Stdout
 	r, w, _ := os.Pipe()
@@ -856,6 +857,7 @@ func TestAuthLogoutCmd_NotAuthenticated(t *testing.T) {
 func TestAuthStatusCmd_NotAuthenticated(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, ".config"))
 
 	old := os.Stdout
 	r, w, _ := os.Pipe()
@@ -881,6 +883,7 @@ func TestAuthStatusCmd_NotAuthenticated(t *testing.T) {
 func TestAuthTokenCmd_NotAuthenticated(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, ".config"))
 
 	rootCmd.SetArgs([]string{"auth", "token"})
 	err := rootCmd.Execute()
@@ -1205,6 +1208,7 @@ func TestAuthLoginCmd_InvalidProvider(t *testing.T) {
 func TestAuthStatusCmd_WithCredentials(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	// Write credentials at platform-specific path
 	credsDir, _ := auth.CredentialsDir()
@@ -1248,6 +1252,7 @@ func TestAuthStatusCmd_WithCredentials(t *testing.T) {
 func TestAuthStatusCmd_ExpiredCredentials(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	credsDir, _ := auth.CredentialsDir()
 	os.MkdirAll(credsDir, 0700)
@@ -1287,6 +1292,7 @@ func TestAuthStatusCmd_ExpiredCredentials(t *testing.T) {
 func TestAuthTokenCmd_WithValidCredentials(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	credsDir, _ := auth.CredentialsDir()
 	os.MkdirAll(credsDir, 0700)
@@ -1326,6 +1332,7 @@ func TestAuthTokenCmd_WithValidCredentials(t *testing.T) {
 func TestAuthLogoutCmd_WithCredentials(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	credsDir, _ := auth.CredentialsDir()
 	os.MkdirAll(credsDir, 0700)
@@ -1387,6 +1394,7 @@ func TestMcpSetupCmd_CursorSuccess(t *testing.T) {
 	tmp := t.TempDir()
 	// Override HOME so .cursor goes to temp
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	old := os.Stdout
 	r, w, _ := os.Pipe()
@@ -1428,6 +1436,7 @@ func TestMcpSetupCmd_CursorSuccess(t *testing.T) {
 func TestMcpSetupCmd_WindsurfSuccess(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	old := os.Stdout
 	_, w, _ := os.Pipe()
@@ -1452,6 +1461,7 @@ func TestMcpSetupCmd_WindsurfSuccess(t *testing.T) {
 func TestMcpSetupCmd_ClineSuccess(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	old := os.Stdout
 	_, w, _ := os.Pipe()
@@ -1476,6 +1486,7 @@ func TestMcpSetupCmd_ClineSuccess(t *testing.T) {
 func TestMcpSetupCmd_PreservesExistingConfig(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	// Pre-create a config with existing data
 	cursorDir := filepath.Join(tmp, ".cursor")
@@ -1911,6 +1922,7 @@ func TestAuthToken_Expired_RefreshSuccess(t *testing.T) {
 
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	// Save expired credentials
 	creds := &auth.Credentials{
@@ -2065,6 +2077,7 @@ func TestOpenapiDownload_Success(t *testing.T) {
 func TestAuthLogout_NoCreds(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	rootCmd.SetArgs([]string{"auth", "logout"})
 	err := rootCmd.Execute()
@@ -2077,6 +2090,7 @@ func TestAuthLogout_NoCreds(t *testing.T) {
 func TestAuthStatus_NoCreds(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	rootCmd.SetArgs([]string{"auth", "status"})
 	err := rootCmd.Execute()
@@ -2307,6 +2321,7 @@ func TestWebhookListen_NoAPIKey(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", "")
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	rootCmd.SetArgs([]string{"webhook", "listen"})
 	err := rootCmd.Execute()
@@ -2380,6 +2395,7 @@ func TestWebhookDelete_NoArgs(t *testing.T) {
 func TestAuthToken_NoCreds(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	rootCmd.SetArgs([]string{"auth", "token"})
 	err := rootCmd.Execute()
@@ -2431,6 +2447,7 @@ func TestAICmd_NoAPIKey(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", "")
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	rootCmd.SetArgs([]string{"ai", "What is the market doing?"})
 	err := rootCmd.Execute()
@@ -2461,6 +2478,7 @@ func TestOpenapiDownload_NoAPIKey(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", "")
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	rootCmd.SetArgs([]string{"openapi", "download"})
 	err := rootCmd.Execute()
@@ -2474,6 +2492,7 @@ func TestOpenapiDiff_NoAPIKey(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", "")
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	// Create local file so it passes the file check
 	os.WriteFile("openapi.yaml", []byte("test"), 0644)
@@ -2491,6 +2510,7 @@ func TestKeysCreate_NoAPIKey(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", "")
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	rootCmd.SetArgs([]string{"keys", "create"})
 	err := rootCmd.Execute()
@@ -2504,6 +2524,7 @@ func TestKeysList_NoAPIKey(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", "")
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	rootCmd.SetArgs([]string{"keys", "list"})
 	err := rootCmd.Execute()
@@ -2517,6 +2538,7 @@ func TestKeysRevoke_NoAPIKey(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", "")
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	rootCmd.SetArgs([]string{"keys", "revoke", "vq_123"})
 	err := rootCmd.Execute()
@@ -2530,6 +2552,7 @@ func TestWebhookList_NoAPIKey(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", "")
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	rootCmd.SetArgs([]string{"webhook", "list"})
 	err := rootCmd.Execute()
@@ -2543,6 +2566,7 @@ func TestWebhookCreate_NoAPIKey(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", "")
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	rootCmd.SetArgs([]string{"webhook", "create", "--url", "https://example.com", "--events", "trade"})
 	err := rootCmd.Execute()
@@ -2556,6 +2580,7 @@ func TestWebhookDelete_NoAPIKey(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", "")
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	rootCmd.SetArgs([]string{"webhook", "delete", "wh_123"})
 	err := rootCmd.Execute()
@@ -2569,6 +2594,7 @@ func TestQuote_NoAPIKey(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", "")
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	rootCmd.SetArgs([]string{"quote", "AAPL"})
 	err := rootCmd.Execute()
@@ -2582,6 +2608,7 @@ func TestUsage_NoAPIKey(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", "")
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	rootCmd.SetArgs([]string{"usage"})
 	err := rootCmd.Execute()
@@ -2600,6 +2627,7 @@ func TestAuthToken_Expired_RefreshFails(t *testing.T) {
 
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	creds := &auth.Credentials{
 		AccessToken:  "old_token",
@@ -2620,6 +2648,7 @@ func TestAuthToken_Expired_RefreshFails(t *testing.T) {
 func TestAuthLogout_WithCreds(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	creds := &auth.Credentials{
 		AccessToken:  "token",
@@ -2646,6 +2675,7 @@ func TestAuthLogout_WithCreds(t *testing.T) {
 func TestAuthStatus_Expired(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	creds := &auth.Credentials{
 		AccessToken:  "token",
@@ -2667,6 +2697,7 @@ func TestAuthStatus_Expired(t *testing.T) {
 func TestAuthToken_Valid(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	creds := &auth.Credentials{
 		AccessToken:  "valid_access_token_123",
@@ -2749,6 +2780,7 @@ func TestQuote_ValidateHTTPError(t *testing.T) {
 func TestAuthStatus_WithValidCreds(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	creds := &auth.Credentials{
 		AccessToken:  "token",

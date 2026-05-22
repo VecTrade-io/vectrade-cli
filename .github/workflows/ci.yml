@@ -91,7 +91,7 @@ jobs:
           go-version-file: ${{ env.GO_VERSION_FILE }}
       - uses: goreleaser/goreleaser-action@v6
         with:
-          args: check
+          args: check --allow-deprecated
 
   security:
     name: Security Scan

@@ -183,6 +183,7 @@ func TestSaveCredentials_CreatesDirectoryAndFile(t *testing.T) {
 	tmp := t.TempDir()
 	// Override HOME so CredentialsDir resolves under tmp
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	creds := &Credentials{
 		AccessToken:  "at_save_test",
@@ -222,6 +223,7 @@ func TestSaveCredentials_CreatesDirectoryAndFile(t *testing.T) {
 func TestLoadCredentials_ReturnsNilWhenNoFile(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	creds, err := LoadCredentials()
 	if err != nil {
@@ -235,6 +237,7 @@ func TestLoadCredentials_ReturnsNilWhenNoFile(t *testing.T) {
 func TestLoadCredentials_ReadsFile(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	original := &Credentials{
 		AccessToken:  "at_load_test",
@@ -272,6 +275,7 @@ func TestLoadCredentials_ReadsFile(t *testing.T) {
 func TestLoadCredentials_InvalidJSON(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	// Create credentials file with invalid JSON at the platform-specific path
 	dir, _ := CredentialsDir()
@@ -287,6 +291,7 @@ func TestLoadCredentials_InvalidJSON(t *testing.T) {
 func TestClearCredentials_RemovesFile(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	// Save credentials first
 	creds := &Credentials{AccessToken: "at_clear", Provider: "google", BaseURL: "https://api.vectrade.io/v1"}
@@ -314,6 +319,7 @@ func TestClearCredentials_RemovesFile(t *testing.T) {
 func TestClearCredentials_NoFileIsOK(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	// Ensure dir exists but no creds file
 	dir, _ := CredentialsDir()
@@ -350,6 +356,7 @@ func TestCredentialsPath_EndsWithJSON(t *testing.T) {
 func TestSaveAndLoadCredentials_FullCycle(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	original := &Credentials{
 		AccessToken:  "cycle_at",

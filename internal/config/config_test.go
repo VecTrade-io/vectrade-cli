@@ -237,6 +237,7 @@ func TestDefaultConfigPath_ReturnsVectradePath(t *testing.T) {
 func TestLoadStoredJWT_NoFile(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	jwt, err := loadStoredJWT()
 	if err != nil {
@@ -250,6 +251,7 @@ func TestLoadStoredJWT_NoFile(t *testing.T) {
 func TestLoadStoredJWT_ValidFile(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	// Create credentials file at the platform-specific path
 	credsDir, _ := auth.CredentialsDir()
@@ -275,6 +277,7 @@ func TestLoadStoredJWT_ValidFile(t *testing.T) {
 func TestLoadStoredJWT_InvalidJSON(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	credsDir, _ := auth.CredentialsDir()
 	os.MkdirAll(credsDir, 0700)
@@ -289,6 +292,7 @@ func TestLoadStoredJWT_InvalidJSON(t *testing.T) {
 func TestLoad_JWTFallbackWhenNoAPIKey(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 	t.Setenv(EnvAPIKey, "")
 	t.Setenv(EnvBaseURL, "")
 	t.Setenv(EnvSandbox, "")
@@ -309,6 +313,7 @@ func TestLoad_JWTFallbackWhenNoAPIKey(t *testing.T) {
 func TestLoad_APIKeyPreventsJWTFallback(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 	t.Setenv(EnvAPIKey, "vq_explicit_key")
 	t.Setenv(EnvBaseURL, "")
 	t.Setenv(EnvSandbox, "")
