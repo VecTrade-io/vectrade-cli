@@ -27,8 +27,8 @@ func TestGet_Success(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if auth := r.Header.Get("Authorization"); auth != "Bearer vq_test_key_12345" {
-			t.Errorf("unexpected auth header: %s", auth)
+		if apiKey := r.Header.Get("X-API-Key"); apiKey != "vq_test_key_12345" {
+			t.Errorf("unexpected X-API-Key header: %s", apiKey)
 		}
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]any{"symbol": "AAPL", "price": 198.5})
@@ -534,14 +534,33 @@ func TestSetHeaders(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, "https://api.vectrade.io/v1/test", nil)
 	client.setHeaders(req)
 
-	if got := req.Header.Get("Authorization"); got != "Bearer vq_test_headers" {
-		t.Errorf("Authorization = %q", got)
+	if got := req.Header.Get("X-API-Key"); got != "vq_test_headers" {
+		t.Errorf("X-API-Key = %q, want vq_test_headers", got)
 	}
 	if got := req.Header.Get("User-Agent"); !strings.HasPrefix(got, "vectrade-cli/") {
 		t.Errorf("User-Agent = %q, expected vectrade-cli/ prefix", got)
 	}
 	if got := req.Header.Get("Accept"); got != "application/json" {
 		t.Errorf("Accept = %q, want application/json", got)
+	}
+}
+
+func TestSetHeaders_JWT(t *testing.T) {
+	cfg := &config.Config{
+		JWTToken: "jwt_test_token",
+		BaseURL:  "https://api.vectrade.io/v1",
+		Timeout:  10,
+	}
+	client := NewClient(cfg)
+
+	req, _ := http.NewRequest(http.MethodGet, "https://api.vectrade.io/v1/test", nil)
+	client.setHeaders(req)
+
+	if got := req.Header.Get("Authorization"); got != "Bearer jwt_test_token" {
+		t.Errorf("Authorization = %q, want 'Bearer jwt_test_token'", got)
+	}
+	if got := req.Header.Get("X-API-Key"); got != "" {
+		t.Errorf("X-API-Key should be empty for JWT auth, got %q", got)
 	}
 }
 

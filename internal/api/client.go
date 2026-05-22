@@ -20,7 +20,8 @@ const maxResponseSize = 10 * 1024 * 1024
 // Client is the VecTrade API HTTP client.
 type Client struct {
 	baseURL    string
-	authHeader string
+	authType   config.AuthType
+	authValue  string
 	httpClient *http.Client
 	userAgent  string
 }
@@ -37,9 +38,11 @@ func WithHTTPClient(hc *http.Client) ClientOption {
 
 // NewClient creates an API client from resolved config.
 func NewClient(cfg *config.Config, opts ...ClientOption) *Client {
+	authType, authValue := cfg.AuthInfo()
 	c := &Client{
-		baseURL:    cfg.BaseURL,
-		authHeader: cfg.AuthHeader(),
+		baseURL:   cfg.BaseURL,
+		authType:  authType,
+		authValue: authValue,
 		httpClient: &http.Client{
 			Timeout: time.Duration(cfg.Timeout) * time.Second,
 		},
@@ -189,7 +192,12 @@ func (c *Client) StreamPost(ctx context.Context, path string, payload any) (io.R
 }
 
 func (c *Client) setHeaders(req *http.Request) {
-	req.Header.Set("Authorization", c.authHeader)
+	switch c.authType {
+	case config.AuthTypeAPIKey:
+		req.Header.Set("X-API-Key", c.authValue)
+	case config.AuthTypeJWT:
+		req.Header.Set("Authorization", "Bearer "+c.authValue)
+	}
 	req.Header.Set("User-Agent", c.userAgent)
 	req.Header.Set("Accept", "application/json")
 }

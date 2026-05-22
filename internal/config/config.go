@@ -115,11 +115,30 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// AuthHeader returns the appropriate Authorization header value.
+// AuthType indicates which authentication mechanism to use.
+type AuthType int
+
+const (
+	// AuthTypeAPIKey uses X-API-Key header.
+	AuthTypeAPIKey AuthType = iota
+	// AuthTypeJWT uses Authorization: Bearer header.
+	AuthTypeJWT
+)
+
+// AuthInfo returns the authentication type and value.
 // Prefers API key over JWT when both are present.
+func (c *Config) AuthInfo() (AuthType, string) {
+	if c.APIKey != "" {
+		return AuthTypeAPIKey, c.APIKey
+	}
+	return AuthTypeJWT, c.JWTToken
+}
+
+// AuthHeader returns the appropriate Authorization header value.
+// Deprecated: Use AuthInfo() for proper header selection.
 func (c *Config) AuthHeader() string {
 	if c.APIKey != "" {
-		return "Bearer " + c.APIKey
+		return c.APIKey
 	}
 	return "Bearer " + c.JWTToken
 }

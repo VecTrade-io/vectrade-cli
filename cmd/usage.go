@@ -48,7 +48,7 @@ func runUsage(cmd *cobra.Command, args []string) error {
 	}
 
 	client := api.NewClient(cfg)
-	body, err := client.Get(context.Background(), "/vq/usage", nil)
+	body, err := client.Get(context.Background(), "/vq/developer/usage", nil)
 	if err != nil {
 		return err
 	}

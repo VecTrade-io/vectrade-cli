@@ -71,7 +71,7 @@ func runKeysCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	client := api.NewClient(cfg)
-	body, err := client.Post(context.Background(), "/vq/keys", map[string]string{"label": keyLabel})
+	body, err := client.Post(context.Background(), "/vq/developer/keys", map[string]string{"label": keyLabel})
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func runKeysList(cmd *cobra.Command, args []string) error {
 	}
 
 	client := api.NewClient(cfg)
-	body, err := client.Get(context.Background(), "/vq/keys", nil)
+	body, err := client.Get(context.Background(), "/vq/developer/keys", nil)
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func runKeysRevoke(cmd *cobra.Command, args []string) error {
 	}
 
 	client := api.NewClient(cfg)
-	err := client.Delete(context.Background(), fmt.Sprintf("/vq/keys/%s", url.PathEscape(args[0])))
+	err := client.Delete(context.Background(), fmt.Sprintf("/vq/developer/keys/%s", url.PathEscape(args[0])))
 	if err != nil {
 		return err
 	}

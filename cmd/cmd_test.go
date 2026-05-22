@@ -52,8 +52,8 @@ func TestQuoteCmd_JsonOutput(t *testing.T) {
 		if r.URL.Path != "/vq/quotes/AAPL" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
-		if r.Header.Get("Authorization") == "" {
-			t.Error("missing Authorization header")
+		if r.Header.Get("X-API-Key") == "" {
+			t.Error("missing X-API-Key header")
 		}
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]any{
@@ -210,7 +210,7 @@ func TestQuoteCmd_TableOutput(t *testing.T) {
 
 func TestKeysListCmd_Success(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/vq/keys" {
+		if r.URL.Path != "/vq/developer/keys" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusOK)
@@ -324,7 +324,7 @@ func TestKeysRevokeCmd_Success(t *testing.T) {
 		if r.Method != http.MethodDelete {
 			t.Errorf("expected DELETE, got %s", r.Method)
 		}
-		if r.URL.Path != "/vq/keys/key_123" {
+		if r.URL.Path != "/vq/developer/keys/key_123" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -365,7 +365,7 @@ func TestKeysRevokeCmd_RequiresKeyID(t *testing.T) {
 
 func TestUsageCmd_Success(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/vq/usage" {
+		if r.URL.Path != "/vq/developer/usage" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusOK)

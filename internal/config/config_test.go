@@ -152,8 +152,8 @@ func TestValidate_JWTTokenSufficient(t *testing.T) {
 
 func TestAuthHeader_PrefersAPIKey(t *testing.T) {
 	cfg := &Config{APIKey: "vq_key", JWTToken: "jwt_tok"}
-	if got := cfg.AuthHeader(); got != "Bearer vq_key" {
-		t.Errorf("expected 'Bearer vq_key', got %q", got)
+	if got := cfg.AuthHeader(); got != "vq_key" {
+		t.Errorf("expected 'vq_key', got %q", got)
 	}
 }
 
@@ -161,6 +161,28 @@ func TestAuthHeader_FallsBackToJWT(t *testing.T) {
 	cfg := &Config{JWTToken: "jwt_tok"}
 	if got := cfg.AuthHeader(); got != "Bearer jwt_tok" {
 		t.Errorf("expected 'Bearer jwt_tok', got %q", got)
+	}
+}
+
+func TestAuthInfo_APIKey(t *testing.T) {
+	cfg := &Config{APIKey: "vq_key", JWTToken: "jwt_tok"}
+	authType, val := cfg.AuthInfo()
+	if authType != AuthTypeAPIKey {
+		t.Errorf("expected AuthTypeAPIKey, got %v", authType)
+	}
+	if val != "vq_key" {
+		t.Errorf("expected 'vq_key', got %q", val)
+	}
+}
+
+func TestAuthInfo_JWT(t *testing.T) {
+	cfg := &Config{JWTToken: "jwt_tok"}
+	authType, val := cfg.AuthInfo()
+	if authType != AuthTypeJWT {
+		t.Errorf("expected AuthTypeJWT, got %v", authType)
+	}
+	if val != "jwt_tok" {
+		t.Errorf("expected 'jwt_tok', got %q", val)
 	}
 }
 
