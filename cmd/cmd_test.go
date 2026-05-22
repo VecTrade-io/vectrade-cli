@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -1685,7 +1686,7 @@ func TestQuoteCmd_WithFields(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", srv.URL)
 
 	old := os.Stdout
-	_, w, _ := os.Pipe()
+	r, w, _ := os.Pipe()
 	os.Stdout = w
 
 	rootCmd.SetArgs([]string{"quote", "AAPL", "--fields", "price,volume"})
@@ -1693,6 +1694,8 @@ func TestQuoteCmd_WithFields(t *testing.T) {
 
 	w.Close()
 	os.Stdout = old
+	io.ReadAll(r)
+	r.Close()
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
