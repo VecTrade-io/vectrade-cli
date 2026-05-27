@@ -11,3 +11,4 @@ dist/
 .env.*
 coverage.out
 completions/
+vectrade
