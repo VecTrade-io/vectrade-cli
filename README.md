@@ -83,6 +83,12 @@ Full documentation is available at [docs.vectrade.io/sdks/cli](https://docs.vect
 - [API Reference](https://docs.vectrade.io/api-reference/overview)
 - [All SDKs](https://docs.vectrade.io/sdks/python)
 
+## Community
+
+- 💬 [Discord](https://discord.gg/vectrade) — Get help, share scripts, discuss workflows
+- 🤖 [MCP Server](https://github.com/VecTrade-io/vectrade-mcp) — Use VecTrade tools in AI IDEs
+- 🧰 [finkit](https://github.com/VecTrade-io/finkit) — Open-source Python analysis library
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
