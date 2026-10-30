@@ -8,9 +8,9 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/spf13/cobra"
 	"github.com/VecTrade-io/vectrade-cli/internal/api"
 	"github.com/VecTrade-io/vectrade-cli/internal/config"
+	"github.com/spf13/cobra"
 )
 
 var keysCmd = &cobra.Command{
@@ -42,7 +42,9 @@ var keyLabel string
 
 func init() {
 	keysCreateCmd.Flags().StringVar(&keyLabel, "label", "", "human-readable label for the key")
-	keysCreateCmd.MarkFlagRequired("label")
+	if err := keysCreateCmd.MarkFlagRequired("label"); err != nil {
+		panic(err)
+	}
 
 	keysCmd.AddCommand(keysCreateCmd)
 	keysCmd.AddCommand(keysListCmd)
@@ -52,16 +54,19 @@ func init() {
 type keyCreateResponse struct {
 	ID        string `json:"id"`
 	Key       string `json:"key"`
+	RawKey    string `json:"raw_key"`
 	Label     string `json:"label"`
 	CreatedAt string `json:"created_at"`
 }
 
 type keyEntry struct {
-	ID        string `json:"id"`
-	Label     string `json:"label"`
-	Prefix    string `json:"prefix"`
-	CreatedAt string `json:"created_at"`
-	LastUsed  string `json:"last_used"`
+	ID         string `json:"id"`
+	Label      string `json:"label"`
+	KeyPrefix  string `json:"key_prefix"`
+	Prefix     string `json:"prefix"`
+	CreatedAt  string `json:"created_at"`
+	LastUsedAt string `json:"last_used_at"`
+	LastUsed   string `json:"last_used"`
 }
 
 func runKeysCreate(cmd *cobra.Command, args []string) error {
@@ -82,7 +87,14 @@ func runKeysCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Fprintf(os.Stdout, "API key created successfully!\n\n")
-	fmt.Fprintf(os.Stdout, "  Key:     %s\n", result.Key)
+	rawKey := result.RawKey
+	if rawKey == "" {
+		rawKey = result.Key
+	}
+	if rawKey == "" {
+		return fmt.Errorf("API response did not include the new key")
+	}
+	fmt.Fprintf(os.Stdout, "  Key:     %s\n", rawKey)
 	fmt.Fprintf(os.Stdout, "  ID:      %s\n", result.ID)
 	fmt.Fprintf(os.Stdout, "  Label:   %s\n", result.Label)
 	fmt.Fprintf(os.Stdout, "\n⚠️  Save this key — it won't be shown again.\n")
@@ -101,22 +113,34 @@ func runKeysList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var result struct {
-		Data []keyEntry `json:"data"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return fmt.Errorf("parsing response: %w", err)
+	var keys []keyEntry
+	if err := json.Unmarshal(body, &keys); err != nil {
+		var result struct {
+			Data []keyEntry `json:"data"`
+		}
+		if wrappedErr := json.Unmarshal(body, &result); wrappedErr != nil {
+			return fmt.Errorf("parsing response: %w", err)
+		}
+		keys = result.Data
 	}
 
-	if len(result.Data) == 0 {
+	if len(keys) == 0 {
 		fmt.Println("No API keys found.")
 		return nil
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "ID\tLABEL\tPREFIX\tCREATED\tLAST USED")
-	for _, k := range result.Data {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", k.ID, k.Label, k.Prefix, k.CreatedAt, k.LastUsed)
+	for _, k := range keys {
+		prefix := k.KeyPrefix
+		if prefix == "" {
+			prefix = k.Prefix
+		}
+		lastUsed := k.LastUsedAt
+		if lastUsed == "" {
+			lastUsed = k.LastUsed
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", k.ID, k.Label, prefix, k.CreatedAt, lastUsed)
 	}
 	return w.Flush()
 }

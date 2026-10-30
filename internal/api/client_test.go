@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -31,7 +32,9 @@ func TestGet_Success(t *testing.T) {
 			t.Errorf("unexpected X-API-Key header: %s", apiKey)
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{"symbol": "AAPL", "price": 198.5})
+		if err := json.NewEncoder(w).Encode(map[string]any{"symbol": "AAPL", "price": 198.5}); err != nil {
+			t.Errorf("encode test response: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -55,7 +58,9 @@ func TestGet_WithParams(t *testing.T) {
 			t.Errorf("unexpected query: %s", r.URL.RawQuery)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"price": 198.5}`))
+		if _, err := w.Write([]byte(`{"price": 198.5}`)); err != nil {
+			t.Errorf("write test response: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -68,10 +73,12 @@ func TestGet_WithParams(t *testing.T) {
 func TestGet_APIError(t *testing.T) {
 	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]any{
+		if err := json.NewEncoder(w).Encode(map[string]any{
 			"error":      map[string]any{"type": "not_found", "message": "Symbol not found"},
 			"request_id": "req_123",
-		})
+		}); err != nil {
+			t.Errorf("encode test response: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -80,8 +87,8 @@ func TestGet_APIError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 
-	apiErr, ok := err.(*APIError)
-	if !ok {
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
 		t.Fatalf("expected *APIError, got %T", err)
 	}
 	if apiErr.StatusCode != 404 {
@@ -104,7 +111,9 @@ func TestPost_Success(t *testing.T) {
 			t.Errorf("expected JSON content-type, got %s", ct)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"content": "Analysis result"}`))
+		if _, err := w.Write([]byte(`{"content": "Analysis result"}`)); err != nil {
+			t.Errorf("write test response: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -132,7 +141,9 @@ func TestUserAgent(t *testing.T) {
 			t.Error("expected User-Agent header")
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{}`))
+		if _, err := w.Write([]byte(`{}`)); err != nil {
+			t.Errorf("write test response: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -147,7 +158,9 @@ func TestGet_ParamsURLEncoded(t *testing.T) {
 			t.Errorf("unexpected decoded query: %s", q)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{}`))
+		if _, err := w.Write([]byte(`{}`)); err != nil {
+			t.Errorf("write test response: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -177,10 +190,12 @@ func TestDelete_Success(t *testing.T) {
 func TestDelete_APIError(t *testing.T) {
 	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		json.NewEncoder(w).Encode(map[string]any{
+		if err := json.NewEncoder(w).Encode(map[string]any{
 			"error":      map[string]any{"type": "forbidden", "message": "insufficient permissions"},
 			"request_id": "req_del_err",
-		})
+		}); err != nil {
+			t.Errorf("encode test response: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -188,8 +203,8 @@ func TestDelete_APIError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	apiErr, ok := err.(*APIError)
-	if !ok {
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
 		t.Fatalf("expected *APIError, got %T", err)
 	}
 	if apiErr.StatusCode != 403 {
@@ -207,7 +222,9 @@ func TestStreamGet_Success(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("data: {\"type\":\"quote.update\"}\n\n"))
+		if _, err := w.Write([]byte("data: {\"type\":\"quote.update\"}\n\n")); err != nil {
+			t.Errorf("write test stream: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -227,7 +244,9 @@ func TestStreamGet_Success(t *testing.T) {
 func TestStreamGet_APIError(t *testing.T) {
 	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"error":{"type":"unauthorized","message":"invalid token"}}`))
+		if _, err := w.Write([]byte(`{"error":{"type":"unauthorized","message":"invalid token"}}`)); err != nil {
+			t.Errorf("write test response: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -235,8 +254,8 @@ func TestStreamGet_APIError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	apiErr, ok := err.(*APIError)
-	if !ok {
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
 		t.Fatalf("expected *APIError, got %T", err)
 	}
 	if apiErr.StatusCode != 401 {
@@ -257,7 +276,9 @@ func TestStreamPost_Success(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("data: {\"content\":\"hello\"}\n\ndata: [DONE]\n\n"))
+		if _, err := w.Write([]byte("data: {\"content\":\"hello\"}\n\ndata: [DONE]\n\n")); err != nil {
+			t.Errorf("write test stream: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -277,7 +298,9 @@ func TestStreamPost_Success(t *testing.T) {
 func TestStreamPost_APIError(t *testing.T) {
 	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTooManyRequests)
-		w.Write([]byte(`{"error":{"type":"rate_limited","message":"too many requests"},"request_id":"req_rl"}`))
+		if _, err := w.Write([]byte(`{"error":{"type":"rate_limited","message":"too many requests"},"request_id":"req_rl"}`)); err != nil {
+			t.Errorf("write test response: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -285,8 +308,8 @@ func TestStreamPost_APIError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	apiErr, ok := err.(*APIError)
-	if !ok {
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
 		t.Fatalf("expected *APIError, got %T", err)
 	}
 	if apiErr.StatusCode != 429 {
@@ -324,8 +347,8 @@ func TestAPIError_Error_WithoutRequestID(t *testing.T) {
 
 func TestParseAPIError_NonJSON(t *testing.T) {
 	err := parseAPIError(502, []byte("Bad Gateway"))
-	apiErr, ok := err.(*APIError)
-	if !ok {
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
 		t.Fatalf("expected *APIError, got %T", err)
 	}
 	if apiErr.StatusCode != 502 {
@@ -355,10 +378,12 @@ func TestWithHTTPClient(t *testing.T) {
 func TestPost_APIError(t *testing.T) {
 	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]any{
+		if err := json.NewEncoder(w).Encode(map[string]any{
 			"error":      map[string]any{"type": "validation", "message": "invalid payload"},
 			"request_id": "req_post_err",
-		})
+		}); err != nil {
+			t.Errorf("encode test response: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -366,8 +391,8 @@ func TestPost_APIError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	apiErr, ok := err.(*APIError)
-	if !ok {
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
 		t.Fatalf("expected *APIError, got %T", err)
 	}
 	if apiErr.Type != "validation" {
@@ -380,7 +405,9 @@ func TestGet_ResponseSizeLimit(t *testing.T) {
 	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		// Write 11MB of data (exceeds 10MB limit)
-		w.Write([]byte(strings.Repeat("x", maxResponseSize+1024)))
+		if _, err := w.Write([]byte(strings.Repeat("x", maxResponseSize+1024))); err != nil {
+			t.Errorf("write oversized test response: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -403,7 +430,9 @@ func TestGet_QueryParams(t *testing.T) {
 			t.Errorf("expected format=yaml, got %s", r.URL.Query().Get("format"))
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		if _, err := w.Write([]byte("ok")); err != nil {
+			t.Errorf("write test response: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -426,7 +455,9 @@ func TestMaxResponseSizeConstant(t *testing.T) {
 func TestPost_ResponseSizeLimit(t *testing.T) {
 	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(strings.Repeat("y", maxResponseSize+512)))
+		if _, err := w.Write([]byte(strings.Repeat("y", maxResponseSize+512))); err != nil {
+			t.Errorf("write oversized test response: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -443,7 +474,9 @@ func TestDelete_ResponseSizeLimit(t *testing.T) {
 	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		// Large error response
-		w.Write([]byte(strings.Repeat("e", maxResponseSize+512)))
+		if _, err := w.Write([]byte(strings.Repeat("e", maxResponseSize+512))); err != nil {
+			t.Errorf("write oversized test response: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -456,7 +489,9 @@ func TestDelete_ResponseSizeLimit(t *testing.T) {
 func TestStreamGet_ResponseSizeLimit(t *testing.T) {
 	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(strings.Repeat("z", maxResponseSize+100)))
+		if _, err := w.Write([]byte(strings.Repeat("z", maxResponseSize+100))); err != nil {
+			t.Errorf("write oversized test response: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -469,7 +504,9 @@ func TestStreamGet_ResponseSizeLimit(t *testing.T) {
 func TestStreamPost_ResponseSizeLimit(t *testing.T) {
 	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(strings.Repeat("w", maxResponseSize+100)))
+		if _, err := w.Write([]byte(strings.Repeat("w", maxResponseSize+100))); err != nil {
+			t.Errorf("write oversized test response: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -485,7 +522,9 @@ func TestGet_NoParams(t *testing.T) {
 			t.Errorf("expected no query params, got %s", r.URL.RawQuery)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"ok": true}`))
+		if _, err := w.Write([]byte(`{"ok": true}`)); err != nil {
+			t.Errorf("write test response: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -689,7 +728,9 @@ func TestStreamGet_Success_ReturnsBody(t *testing.T) {
 	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("data: hello\n\n"))
+		if _, err := w.Write([]byte("data: hello\n\n")); err != nil {
+			t.Errorf("write test stream: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -710,7 +751,9 @@ func TestStreamPost_Success_ReturnsBody(t *testing.T) {
 	srv, client := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("data: world\n\n"))
+		if _, err := w.Write([]byte("data: world\n\n")); err != nil {
+			t.Errorf("write test stream: %v", err)
+		}
 	})
 	defer srv.Close()
 
@@ -742,8 +785,8 @@ func TestDelete_Success_NoContent(t *testing.T) {
 func TestParseAPIError_WithRequestID(t *testing.T) {
 	body := `{"error":{"type":"rate_limit","message":"too many requests"},"request_id":"req_abc"}`
 	err := parseAPIError(429, []byte(body))
-	apiErr, ok := err.(*APIError)
-	if !ok {
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
 		t.Fatalf("expected *APIError, got %T", err)
 	}
 	if apiErr.RequestID != "req_abc" {

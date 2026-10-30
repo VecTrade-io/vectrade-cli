@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"github.com/spf13/cobra"
 	"github.com/VecTrade-io/vectrade-cli/internal/api"
+	"github.com/spf13/cobra"
 )
 
 var (

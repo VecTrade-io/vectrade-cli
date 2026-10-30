@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/spf13/cobra"
 	"github.com/VecTrade-io/vectrade-cli/internal/auth"
+	"github.com/spf13/cobra"
 )
 
 // Build-time variables set via ldflags (see .goreleaser.yml).

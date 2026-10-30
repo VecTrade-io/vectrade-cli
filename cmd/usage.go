@@ -5,11 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"text/tabwriter"
 
-	"github.com/spf13/cobra"
 	"github.com/VecTrade-io/vectrade-cli/internal/api"
 	"github.com/VecTrade-io/vectrade-cli/internal/config"
+	"github.com/spf13/cobra"
 )
 
 var usageCmd = &cobra.Command{
@@ -26,19 +25,14 @@ func init() {
 }
 
 type usageResponse struct {
-	Period        string          `json:"period"`
-	PlanName      string          `json:"plan_name"`
-	RequestsUsed  int            `json:"requests_used"`
-	RequestsLimit int            `json:"requests_limit"`
-	CreditsUsed   float64        `json:"credits_used"`
-	CreditsLimit  float64        `json:"credits_limit"`
-	Endpoints     []endpointUsage `json:"endpoints"`
-}
-
-type endpointUsage struct {
-	Name     string  `json:"name"`
-	Requests int     `json:"requests"`
-	Pct      float64 `json:"pct"`
+	Period         string `json:"period"`
+	PlanName       string `json:"plan_name"`
+	TotalRequests  int    `json:"total_requests"`
+	QuotaLimit     int    `json:"quota_limit"`
+	TokensUsed     int    `json:"tokens_used"`
+	TokenQuota     int    `json:"token_quota"`
+	TokenRemaining int    `json:"token_remaining"`
+	OverageCalls   int    `json:"overage_calls"`
 }
 
 func runUsage(cmd *cobra.Command, args []string) error {
@@ -60,25 +54,15 @@ func runUsage(cmd *cobra.Command, args []string) error {
 
 	fmt.Fprintf(os.Stdout, "Plan: %s | Period: %s\n\n", result.PlanName, result.Period)
 
-	var requestsPct, creditsPct float64
-	if result.RequestsLimit > 0 {
-		requestsPct = float64(result.RequestsUsed) / float64(result.RequestsLimit) * 100
-	}
-	if result.CreditsLimit > 0 {
-		creditsPct = result.CreditsUsed / result.CreditsLimit * 100
+	var requestsPct float64
+	if result.QuotaLimit > 0 {
+		requestsPct = float64(result.TotalRequests) / float64(result.QuotaLimit) * 100
 	}
 
-	fmt.Fprintf(os.Stdout, "Requests:  %d / %d (%.1f%%)\n", result.RequestsUsed, result.RequestsLimit, requestsPct)
-	fmt.Fprintf(os.Stdout, "Credits:   %.2f / %.2f (%.1f%%)\n\n", result.CreditsUsed, result.CreditsLimit, creditsPct)
-
-	if len(result.Endpoints) > 0 {
-		fmt.Fprintln(os.Stdout, "Top endpoints:")
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "ENDPOINT\tREQUESTS\tSHARE")
-		for _, ep := range result.Endpoints {
-			fmt.Fprintf(w, "%s\t%d\t%.1f%%\n", ep.Name, ep.Requests, ep.Pct)
-		}
-		w.Flush()
+	fmt.Fprintf(os.Stdout, "Requests:  %d / %d (%.1f%%)\n", result.TotalRequests, result.QuotaLimit, requestsPct)
+	fmt.Fprintf(os.Stdout, "Tokens:    %d / %d (%d remaining)\n", result.TokensUsed, result.TokenQuota, result.TokenRemaining)
+	if result.OverageCalls > 0 {
+		fmt.Fprintf(os.Stdout, "Overage calls: %d\n", result.OverageCalls)
 	}
 
 	return nil

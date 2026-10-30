@@ -21,6 +21,63 @@ func testServer(handler http.HandlerFunc) *httptest.Server {
 	return srv
 }
 
+func writeTestJSON(t *testing.T, w http.ResponseWriter, value any) {
+	t.Helper()
+	if err := json.NewEncoder(w).Encode(value); err != nil {
+		t.Errorf("encode test response: %v", err)
+	}
+}
+
+func writeTestBody(t *testing.T, w http.ResponseWriter, body []byte) {
+	t.Helper()
+	if _, err := w.Write(body); err != nil {
+		t.Errorf("write test response: %v", err)
+	}
+}
+
+func readTestOutput(t *testing.T, r io.Reader) string {
+	t.Helper()
+	output, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("read test output: %v", err)
+	}
+	return string(output)
+}
+
+func changeTestDirectory(t *testing.T, dir string) {
+	t.Helper()
+	original, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working directory: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("change working directory: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(original); err != nil {
+			t.Errorf("restore working directory: %v", err)
+		}
+	})
+}
+
+func writeTestCredentials(t *testing.T, credentials map[string]any) {
+	t.Helper()
+	credsDir, err := auth.CredentialsDir()
+	if err != nil {
+		t.Fatalf("resolve credentials directory: %v", err)
+	}
+	if err := os.MkdirAll(credsDir, 0700); err != nil {
+		t.Fatalf("create credentials directory: %v", err)
+	}
+	data, err := json.Marshal(credentials)
+	if err != nil {
+		t.Fatalf("marshal credentials fixture: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(credsDir, "credentials.json"), data, 0600); err != nil {
+		t.Fatalf("write credentials fixture: %v", err)
+	}
+}
+
 func TestRootCmd_UseName(t *testing.T) {
 	if rootCmd.Use != "vectrade" {
 		t.Errorf("expected root command Use to be 'vectrade', got %q", rootCmd.Use)
@@ -57,7 +114,7 @@ func TestQuoteCmd_JsonOutput(t *testing.T) {
 			t.Error("missing X-API-Key header")
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"symbol":    "AAPL",
 			"price":     198.50,
 			"change":    2.30,
@@ -86,9 +143,7 @@ func TestQuoteCmd_JsonOutput(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if output == "" {
 		// Command may not support --output flag at root level; just verify no error
 		return
@@ -110,9 +165,7 @@ func TestVersionCmd_Output(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if len(output) == 0 {
 		t.Error("expected version output, got empty string")
 	}
@@ -168,7 +221,7 @@ func TestMcpCmd_Exists(t *testing.T) {
 func TestQuoteCmd_TableOutput(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"symbol":         "MSFT",
 			"price":          415.00,
 			"change":         3.50,
@@ -198,9 +251,7 @@ func TestQuoteCmd_TableOutput(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if !strings.Contains(output, "MSFT") {
 		t.Errorf("expected MSFT in output, got: %s", output)
 	}
@@ -215,10 +266,8 @@ func TestKeysListCmd_Success(t *testing.T) {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
-			"data": []map[string]any{
-				{"id": "key_1", "label": "test-key", "prefix": "vq_live_xxx", "created_at": "2025-01-01", "last_used": "2025-05-17"},
-			},
+		writeTestJSON(t, w, []map[string]any{
+			{"id": "key_1", "label": "test-key", "key_prefix": "vq_live_xxx", "scopes": "*", "status": "ACTIVE", "rate_limit_rpm": 60, "created_at": "2025-01-01", "last_used_at": "2025-05-17"},
 		})
 	})
 	defer srv.Close()
@@ -240,9 +289,7 @@ func TestKeysListCmd_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if !strings.Contains(output, "test-key") {
 		t.Errorf("expected 'test-key' in output, got: %s", output)
 	}
@@ -251,7 +298,9 @@ func TestKeysListCmd_Success(t *testing.T) {
 func TestKeysListCmd_Empty(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{"data": []map[string]any{}})
+		writeTestJSON(t, w, map[string]any{
+			"data": []map[string]any{},
+		})
 	})
 	defer srv.Close()
 
@@ -272,9 +321,7 @@ func TestKeysListCmd_Empty(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if !strings.Contains(output, "No API keys found") {
 		t.Errorf("expected 'No API keys found', got: %s", output)
 	}
@@ -286,9 +333,9 @@ func TestKeysCreateCmd_Success(t *testing.T) {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"id":         "key_new",
-			"key":        "vq_live_newkey123",
+			"raw_key":    "vq_live_newkey123",
 			"label":      "my-bot",
 			"created_at": "2025-05-17",
 		})
@@ -312,9 +359,7 @@ func TestKeysCreateCmd_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if !strings.Contains(output, "vq_live_newkey123") {
 		t.Errorf("expected key in output, got: %s", output)
 	}
@@ -349,10 +394,9 @@ func TestKeysRevokeCmd_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	if !strings.Contains(buf.String(), "revoked") {
-		t.Errorf("expected 'revoked' in output, got: %s", buf.String())
+	output := readTestOutput(t, r)
+	if !strings.Contains(output, "revoked") {
+		t.Errorf("expected 'revoked' in output, got: %s", output)
 	}
 }
 
@@ -370,14 +414,14 @@ func TestUsageCmd_Success(t *testing.T) {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
-			"period":         "2025-05",
-			"plan_name":      "Pro",
-			"requests_used":  500,
-			"requests_limit": 10000,
-			"credits_used":   12.5,
-			"credits_limit":  100.0,
-			"endpoints":      []map[string]any{},
+		writeTestJSON(t, w, map[string]any{
+			"period":          "2025-05",
+			"plan_name":       "Pro",
+			"total_requests":  500,
+			"quota_limit":     10000,
+			"tokens_used":     12500,
+			"token_quota":     100000,
+			"token_remaining": 87500,
 		})
 	})
 	defer srv.Close()
@@ -399,9 +443,7 @@ func TestUsageCmd_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if !strings.Contains(output, "Pro") {
 		t.Errorf("expected plan name 'Pro', got: %s", output)
 	}
@@ -413,14 +455,14 @@ func TestUsageCmd_Success(t *testing.T) {
 func TestUsageCmd_ZeroLimits(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
-			"period":         "2025-05",
-			"plan_name":      "Free",
-			"requests_used":  0,
-			"requests_limit": 0,
-			"credits_used":   0.0,
-			"credits_limit":  0.0,
-			"endpoints":      []map[string]any{},
+		writeTestJSON(t, w, map[string]any{
+			"period":          "2025-05",
+			"plan_name":       "Free",
+			"total_requests":  0,
+			"quota_limit":     0,
+			"tokens_used":     0,
+			"token_quota":     0,
+			"token_remaining": 0,
 		})
 	})
 	defer srv.Close()
@@ -460,7 +502,7 @@ func TestWebhookCmd_HasSubcommands(t *testing.T) {
 func TestWebhookListCmd_Success(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"data": []map[string]any{
 				{
 					"id":         "wh_1",
@@ -491,9 +533,7 @@ func TestWebhookListCmd_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if !strings.Contains(output, "wh_1") {
 		t.Errorf("expected webhook ID, got: %s", output)
 	}
@@ -533,10 +573,9 @@ func TestWebhookDeleteCmd_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	if !strings.Contains(buf.String(), "deleted") {
-		t.Errorf("expected 'deleted' in output, got: %s", buf.String())
+	output := readTestOutput(t, r)
+	if !strings.Contains(output, "deleted") {
+		t.Errorf("expected 'deleted' in output, got: %s", output)
 	}
 }
 
@@ -581,9 +620,7 @@ func TestVersionCmd_ContainsGoVersion(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if !strings.Contains(output, "go") {
 		t.Errorf("version output should contain go version, got: %s", output)
 	}
@@ -618,7 +655,7 @@ func TestWebhookCreateCmd_Success(t *testing.T) {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"id":     "wh_new",
 			"url":    "https://example.com/hook",
 			"events": []string{"quote.update"},
@@ -644,9 +681,7 @@ func TestWebhookCreateCmd_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if !strings.Contains(output, "wh_new") {
 		t.Errorf("expected webhook ID, got: %s", output)
 	}
@@ -655,7 +690,7 @@ func TestWebhookCreateCmd_Success(t *testing.T) {
 func TestOpenapiDownloadCmd_Success(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("openapi: '3.1.0'\ninfo:\n  title: VecTrade\n  version: '1.0.0'\n"))
+		writeTestBody(t, w, []byte("openapi: '3.1.0'\ninfo:\n  title: VecTrade\n  version: '1.0.0'\n"))
 	})
 	defer srv.Close()
 
@@ -663,9 +698,7 @@ func TestOpenapiDownloadCmd_Success(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", srv.URL)
 
 	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	changeTestDirectory(t, tmpDir)
 
 	old := os.Stdout
 	r, w, _ := os.Pipe()
@@ -681,10 +714,9 @@ func TestOpenapiDownloadCmd_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	if !strings.Contains(buf.String(), "downloaded") {
-		t.Errorf("expected 'downloaded' in output, got: %s", buf.String())
+	output := readTestOutput(t, r)
+	if !strings.Contains(output, "downloaded") {
+		t.Errorf("expected 'downloaded' in output, got: %s", output)
 	}
 
 	// Verify file was written
@@ -700,7 +732,7 @@ func TestOpenapiDownloadCmd_Success(t *testing.T) {
 func TestOpenapiDownloadCmd_PathTraversal(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("openapi: '3.1.0'"))
+		writeTestBody(t, w, []byte("openapi: '3.1.0'"))
 	})
 	defer srv.Close()
 
@@ -708,9 +740,7 @@ func TestOpenapiDownloadCmd_PathTraversal(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", srv.URL)
 
 	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	changeTestDirectory(t, tmpDir)
 
 	rootCmd.SetArgs([]string{"openapi", "download", "-o", "../../../etc/evil.yaml"})
 	err := rootCmd.Execute()
@@ -727,9 +757,7 @@ func TestOpenapiDiffCmd_NoLocalFile(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", "https://api.vectrade.io/v1")
 
 	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	changeTestDirectory(t, tmpDir)
 
 	// Reset shared flag var
 	openapiOutput = "openapi.yaml"
@@ -748,7 +776,7 @@ func TestOpenapiDiffCmd_SpecUpToDate(t *testing.T) {
 	specContent := "openapi: '3.1.0'\ninfo:\n  title: VecTrade\n"
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(specContent))
+		writeTestBody(t, w, []byte(specContent))
 	})
 	defer srv.Close()
 
@@ -756,15 +784,15 @@ func TestOpenapiDiffCmd_SpecUpToDate(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", srv.URL)
 
 	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	changeTestDirectory(t, tmpDir)
 
 	// Reset shared flag var
 	openapiOutput = "openapi.yaml"
 
 	// Write local spec matching remote
-	os.WriteFile("openapi.yaml", []byte(specContent), 0644)
+	if err := os.WriteFile("openapi.yaml", []byte(specContent), 0o600); err != nil {
+		t.Fatalf("write local OpenAPI fixture: %v", err)
+	}
 
 	old := os.Stdout
 	r, w, _ := os.Pipe()
@@ -780,17 +808,16 @@ func TestOpenapiDiffCmd_SpecUpToDate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	if !strings.Contains(buf.String(), "up to date") {
-		t.Errorf("expected 'up to date', got: %s", buf.String())
+	output := readTestOutput(t, r)
+	if !strings.Contains(output, "up to date") {
+		t.Errorf("expected 'up to date', got: %s", output)
 	}
 }
 
 func TestOpenapiDiffCmd_SpecChanged(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("openapi: '3.1.0'\ninfo:\n  title: VecTrade\n  version: '2.0.0'\n"))
+		writeTestBody(t, w, []byte("openapi: '3.1.0'\ninfo:\n  title: VecTrade\n  version: '2.0.0'\n"))
 	})
 	defer srv.Close()
 
@@ -798,14 +825,14 @@ func TestOpenapiDiffCmd_SpecChanged(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", srv.URL)
 
 	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	changeTestDirectory(t, tmpDir)
 
 	// Reset shared flag var
 	openapiOutput = "openapi.yaml"
 
-	os.WriteFile("openapi.yaml", []byte("openapi: '3.1.0'\ninfo:\n  title: VecTrade\n  version: '1.0.0'\n"), 0644)
+	if err := os.WriteFile("openapi.yaml", []byte("openapi: '3.1.0'\ninfo:\n  title: VecTrade\n  version: '1.0.0'\n"), 0o600); err != nil {
+		t.Fatalf("write local OpenAPI fixture: %v", err)
+	}
 
 	old := os.Stdout
 	r, w, _ := os.Pipe()
@@ -821,10 +848,9 @@ func TestOpenapiDiffCmd_SpecChanged(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	if !strings.Contains(buf.String(), "changed") {
-		t.Errorf("expected 'changed', got: %s", buf.String())
+	output := readTestOutput(t, r)
+	if !strings.Contains(output, "changed") {
+		t.Errorf("expected 'changed', got: %s", output)
 	}
 }
 
@@ -848,10 +874,9 @@ func TestAuthLogoutCmd_NotAuthenticated(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	if !strings.Contains(buf.String(), "Not currently authenticated") {
-		t.Errorf("expected 'Not currently authenticated', got: %s", buf.String())
+	output := readTestOutput(t, r)
+	if !strings.Contains(output, "Not currently authenticated") {
+		t.Errorf("expected 'Not currently authenticated', got: %s", output)
 	}
 }
 
@@ -874,10 +899,9 @@ func TestAuthStatusCmd_NotAuthenticated(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	if !strings.Contains(buf.String(), "Not authenticated") {
-		t.Errorf("expected 'Not authenticated', got: %s", buf.String())
+	output := readTestOutput(t, r)
+	if !strings.Contains(output, "Not authenticated") {
+		t.Errorf("expected 'Not authenticated', got: %s", output)
 	}
 }
 
@@ -896,20 +920,18 @@ func TestAuthTokenCmd_NotAuthenticated(t *testing.T) {
 	}
 }
 
-func TestUsageCmd_WithEndpoints(t *testing.T) {
+func TestUsageCmd_CurrentDeveloperResponse(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
-			"period":         "2025-05",
-			"plan_name":      "Enterprise",
-			"requests_used":  8000,
-			"requests_limit": 50000,
-			"credits_used":   45.0,
-			"credits_limit":  200.0,
-			"endpoints": []map[string]any{
-				{"path": "/vq/quotes", "calls": 5000},
-				{"path": "/vq/ai/analyze", "calls": 3000},
-			},
+		writeTestJSON(t, w, map[string]any{
+			"period":          "2025-05",
+			"plan_name":       "Enterprise",
+			"total_requests":  8000,
+			"quota_limit":     50000,
+			"tokens_used":     45,
+			"token_quota":     200,
+			"token_remaining": 155,
+			"overage_calls":   0,
 		})
 	})
 	defer srv.Close()
@@ -931,21 +953,22 @@ func TestUsageCmd_WithEndpoints(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if !strings.Contains(output, "Enterprise") {
 		t.Errorf("expected 'Enterprise', got: %s", output)
 	}
 	if !strings.Contains(output, "8000") {
 		t.Errorf("expected '8000', got: %s", output)
 	}
+	if !strings.Contains(output, "45 / 200") {
+		t.Errorf("expected token usage, got: %s", output)
+	}
 }
 
 func TestQuoteCmd_JSONOutput(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"symbol": "TSLA",
 			"price":  180.50,
 		})
@@ -969,9 +992,7 @@ func TestQuoteCmd_JSONOutput(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if !strings.Contains(output, "TSLA") {
 		t.Errorf("expected TSLA in JSON output, got: %s", output)
 	}
@@ -1061,9 +1082,9 @@ func TestAiCmd_StreamingOutput(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("data: {\"content\":\"Hello \",\"type\":\"text\"}\n\n"))
-		w.Write([]byte("data: {\"content\":\"World!\",\"type\":\"text\"}\n\n"))
-		w.Write([]byte("data: [DONE]\n\n"))
+		writeTestBody(t, w, []byte("data: {\"content\":\"Hello \",\"type\":\"text\"}\n\n"))
+		writeTestBody(t, w, []byte("data: {\"content\":\"World!\",\"type\":\"text\"}\n\n"))
+		writeTestBody(t, w, []byte("data: [DONE]\n\n"))
 	})
 	defer srv.Close()
 
@@ -1084,9 +1105,7 @@ func TestAiCmd_StreamingOutput(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if !strings.Contains(output, "Hello ") {
 		t.Errorf("expected 'Hello ' in output, got: %s", output)
 	}
@@ -1099,10 +1118,10 @@ func TestAiCmd_SkipsNonDataLines(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(": comment line\n\n"))
-		w.Write([]byte("event: status\n\n"))
-		w.Write([]byte("data: {\"content\":\"only this\"}\n\n"))
-		w.Write([]byte("data: [DONE]\n\n"))
+		writeTestBody(t, w, []byte(": comment line\n\n"))
+		writeTestBody(t, w, []byte("event: status\n\n"))
+		writeTestBody(t, w, []byte("data: {\"content\":\"only this\"}\n\n"))
+		writeTestBody(t, w, []byte("data: [DONE]\n\n"))
 	})
 	defer srv.Close()
 
@@ -1123,9 +1142,7 @@ func TestAiCmd_SkipsNonDataLines(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if !strings.Contains(output, "only this") {
 		t.Errorf("expected 'only this' in output, got: %s", output)
 	}
@@ -1135,9 +1152,9 @@ func TestAiCmd_InvalidJSON(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("data: not-json\n\n"))
-		w.Write([]byte("data: {\"content\":\"ok\"}\n\n"))
-		w.Write([]byte("data: [DONE]\n\n"))
+		writeTestBody(t, w, []byte("data: not-json\n\n"))
+		writeTestBody(t, w, []byte("data: {\"content\":\"ok\"}\n\n"))
+		writeTestBody(t, w, []byte("data: [DONE]\n\n"))
 	})
 	defer srv.Close()
 
@@ -1158,17 +1175,16 @@ func TestAiCmd_InvalidJSON(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	if !strings.Contains(buf.String(), "ok") {
-		t.Errorf("expected 'ok' after invalid JSON line, got: %s", buf.String())
+	output := readTestOutput(t, r)
+	if !strings.Contains(output, "ok") {
+		t.Errorf("expected 'ok' after invalid JSON line, got: %s", output)
 	}
 }
 
 func TestAiCmd_APIError(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTooManyRequests)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"error": map[string]any{"type": "rate_limited", "message": "too fast"},
 		})
 	})
@@ -1212,18 +1228,14 @@ func TestAuthStatusCmd_WithCredentials(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	// Write credentials at platform-specific path
-	credsDir, _ := auth.CredentialsDir()
-	os.MkdirAll(credsDir, 0700)
-	creds := map[string]any{
+	writeTestCredentials(t, map[string]any{
 		"access_token":  "at_status_test",
 		"refresh_token": "rt_status_test",
 		"session_id":    "sess_status",
 		"provider":      "google",
 		"base_url":      "https://api.vectrade.io/v1",
 		"expires_at":    "2099-12-01T00:00:00Z",
-	}
-	data, _ := json.Marshal(creds)
-	os.WriteFile(filepath.Join(credsDir, "credentials.json"), data, 0600)
+	})
 
 	old := os.Stdout
 	r, w, _ := os.Pipe()
@@ -1239,9 +1251,7 @@ func TestAuthStatusCmd_WithCredentials(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if !strings.Contains(output, "valid") {
 		t.Errorf("expected 'valid' status, got: %s", output)
 	}
@@ -1255,18 +1265,14 @@ func TestAuthStatusCmd_ExpiredCredentials(t *testing.T) {
 	t.Setenv("HOME", tmp)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
-	credsDir, _ := auth.CredentialsDir()
-	os.MkdirAll(credsDir, 0700)
-	creds := map[string]any{
+	writeTestCredentials(t, map[string]any{
 		"access_token":  "at_expired",
 		"refresh_token": "rt_expired",
 		"session_id":    "sess_expired",
 		"provider":      "microsoft",
 		"base_url":      "https://api.vectrade.io/v1",
 		"expires_at":    "2020-01-01T00:00:00Z",
-	}
-	data, _ := json.Marshal(creds)
-	os.WriteFile(filepath.Join(credsDir, "credentials.json"), data, 0600)
+	})
 
 	old := os.Stdout
 	r, w, _ := os.Pipe()
@@ -1282,9 +1288,7 @@ func TestAuthStatusCmd_ExpiredCredentials(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if !strings.Contains(output, "expired") {
 		t.Errorf("expected 'expired' status, got: %s", output)
 	}
@@ -1295,18 +1299,14 @@ func TestAuthTokenCmd_WithValidCredentials(t *testing.T) {
 	t.Setenv("HOME", tmp)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
-	credsDir, _ := auth.CredentialsDir()
-	os.MkdirAll(credsDir, 0700)
-	creds := map[string]any{
+	writeTestCredentials(t, map[string]any{
 		"access_token":  "at_token_output",
 		"refresh_token": "rt_token_test",
 		"session_id":    "sess_token",
 		"provider":      "google",
 		"base_url":      "https://api.vectrade.io/v1",
 		"expires_at":    "2099-12-01T00:00:00Z",
-	}
-	data, _ := json.Marshal(creds)
-	os.WriteFile(filepath.Join(credsDir, "credentials.json"), data, 0600)
+	})
 
 	old := os.Stdout
 	r, w, _ := os.Pipe()
@@ -1322,9 +1322,7 @@ func TestAuthTokenCmd_WithValidCredentials(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if output != "at_token_output" {
 		t.Errorf("expected raw token 'at_token_output', got %q", output)
 	}
@@ -1336,14 +1334,11 @@ func TestAuthLogoutCmd_WithCredentials(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	credsDir, _ := auth.CredentialsDir()
-	os.MkdirAll(credsDir, 0700)
-	creds := map[string]any{
+	writeTestCredentials(t, map[string]any{
 		"access_token": "at_logout_test",
 		"provider":     "google",
 		"base_url":     "https://api.vectrade.io/v1",
-	}
-	data, _ := json.Marshal(creds)
-	os.WriteFile(filepath.Join(credsDir, "credentials.json"), data, 0600)
+	})
 
 	old := os.Stdout
 	r, w, _ := os.Pipe()
@@ -1359,9 +1354,7 @@ func TestAuthLogoutCmd_WithCredentials(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if !strings.Contains(output, "Logged out") {
 		t.Errorf("expected 'Logged out', got: %s", output)
 	}
@@ -1411,9 +1404,7 @@ func TestMcpSetupCmd_CursorSuccess(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if !strings.Contains(output, "VecTrade MCP configured") {
 		t.Errorf("expected success message, got: %s", output)
 	}
@@ -1491,7 +1482,9 @@ func TestMcpSetupCmd_PreservesExistingConfig(t *testing.T) {
 
 	// Pre-create a config with existing data
 	cursorDir := filepath.Join(tmp, ".cursor")
-	os.MkdirAll(cursorDir, 0750)
+	if err := os.MkdirAll(cursorDir, 0750); err != nil {
+		t.Fatalf("create cursor config directory: %v", err)
+	}
 	existing := map[string]any{
 		"existingKey": "existingValue",
 		"mcpServers": map[string]any{
@@ -1499,7 +1492,9 @@ func TestMcpSetupCmd_PreservesExistingConfig(t *testing.T) {
 		},
 	}
 	data, _ := json.MarshalIndent(existing, "", "  ")
-	os.WriteFile(filepath.Join(cursorDir, "mcp.json"), data, 0600)
+	if err := os.WriteFile(filepath.Join(cursorDir, "mcp.json"), data, 0600); err != nil {
+		t.Fatalf("write cursor config fixture: %v", err)
+	}
 
 	old := os.Stdout
 	_, w, _ := os.Pipe()
@@ -1518,7 +1513,9 @@ func TestMcpSetupCmd_PreservesExistingConfig(t *testing.T) {
 	// Verify existing data preserved
 	result, _ := os.ReadFile(filepath.Join(cursorDir, "mcp.json"))
 	var cfg map[string]any
-	json.Unmarshal(result, &cfg)
+	if err := json.Unmarshal(result, &cfg); err != nil {
+		t.Fatalf("decode preserved MCP config: %v", err)
+	}
 
 	if cfg["existingKey"] != "existingValue" {
 		t.Error("existing config key was lost")
@@ -1535,7 +1532,7 @@ func TestMcpSetupCmd_PreservesExistingConfig(t *testing.T) {
 func TestWebhookListCmd_NoWebhooks(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{"data": []map[string]any{}})
+		writeTestJSON(t, w, map[string]any{"data": []map[string]any{}})
 	})
 	defer srv.Close()
 
@@ -1556,17 +1553,16 @@ func TestWebhookListCmd_NoWebhooks(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	if !strings.Contains(buf.String(), "No webhooks registered") {
-		t.Errorf("expected 'No webhooks registered', got: %s", buf.String())
+	output := readTestOutput(t, r)
+	if !strings.Contains(output, "No webhooks registered") {
+		t.Errorf("expected 'No webhooks registered', got: %s", output)
 	}
 }
 
 func TestWebhookListCmd_InactiveWebhook(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"data": []map[string]any{
 				{
 					"id":         "wh_inactive",
@@ -1597,9 +1593,7 @@ func TestWebhookListCmd_InactiveWebhook(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if !strings.Contains(output, "inactive") {
 		t.Errorf("expected 'inactive' status, got: %s", output)
 	}
@@ -1633,7 +1627,7 @@ func TestWebhookCreateCmd_RequiresFlags(t *testing.T) {
 func TestQuoteCmd_CSVOutput(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"symbol":    "NVDA",
 			"price":     950.00,
 			"change":    15.00,
@@ -1660,9 +1654,7 @@ func TestQuoteCmd_CSVOutput(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	// CSV output should contain field headers
 	if !strings.Contains(output, "Field") || !strings.Contains(output, "Value") {
 		t.Errorf("expected CSV headers, got: %s", output)
@@ -1675,7 +1667,7 @@ func TestQuoteCmd_WithFields(t *testing.T) {
 			t.Errorf("expected fields=price,volume, got %s", r.URL.Query().Get("fields"))
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"symbol": "AAPL",
 			"price":  198.50,
 		})
@@ -1694,7 +1686,9 @@ func TestQuoteCmd_WithFields(t *testing.T) {
 
 	w.Close()
 	os.Stdout = old
-	io.ReadAll(r)
+	if _, err := io.ReadAll(r); err != nil {
+		t.Fatalf("read quote command output: %v", err)
+	}
 	r.Close()
 
 	if err != nil {
@@ -1705,7 +1699,7 @@ func TestQuoteCmd_WithFields(t *testing.T) {
 func TestQuoteCmd_APIError(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"error": map[string]any{"type": "not_found", "message": "Symbol not found"},
 		})
 	})
@@ -1735,7 +1729,7 @@ func TestUsageCmd_NoAPIKey(t *testing.T) {
 func TestKeysListCmd_APIError(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"error": map[string]any{"type": "unauthorized", "message": "bad token"},
 		})
 	})
@@ -1754,7 +1748,7 @@ func TestKeysListCmd_APIError(t *testing.T) {
 func TestKeysCreateCmd_APIError(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"error": map[string]any{"type": "validation", "message": "label too long"},
 		})
 	})
@@ -1773,7 +1767,7 @@ func TestKeysCreateCmd_APIError(t *testing.T) {
 func TestKeysRevokeCmd_APIError(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"error": map[string]any{"type": "not_found", "message": "key not found"},
 		})
 	})
@@ -1792,7 +1786,7 @@ func TestKeysRevokeCmd_APIError(t *testing.T) {
 func TestWebhookDeleteCmd_APIError(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"error": map[string]any{"type": "forbidden", "message": "no permission"},
 		})
 	})
@@ -1814,7 +1808,7 @@ func TestOpenapiDownloadCmd_WithVersion(t *testing.T) {
 			t.Errorf("expected version=2.0, got %s", v)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("openapi: '3.1.0'\n"))
+		writeTestBody(t, w, []byte("openapi: '3.1.0'\n"))
 	})
 	defer srv.Close()
 
@@ -1822,9 +1816,7 @@ func TestOpenapiDownloadCmd_WithVersion(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", srv.URL)
 
 	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	changeTestDirectory(t, tmpDir)
 
 	old := os.Stdout
 	_, w, _ := os.Pipe()
@@ -1847,7 +1839,7 @@ func TestOpenapiDownloadCmd_WithVersion(t *testing.T) {
 func TestOpenapiDownloadCmd_APIError(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"error":{"type":"internal","message":"server error"}}`))
+		writeTestBody(t, w, []byte(`{"error":{"type":"internal","message":"server error"}}`))
 	})
 	defer srv.Close()
 
@@ -1855,9 +1847,7 @@ func TestOpenapiDownloadCmd_APIError(t *testing.T) {
 	t.Setenv("VECTRADE_BASE_URL", srv.URL)
 
 	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	changeTestDirectory(t, tmpDir)
 
 	openapiOutput = "openapi.yaml"
 	rootCmd.SetArgs([]string{"openapi", "download"})
@@ -1916,7 +1906,7 @@ func TestAuthToken_Expired_RefreshSuccess(t *testing.T) {
 	// Create a mock refresh server
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"access":  "refreshed_token_abc",
 			"refresh": "new_refresh_tok",
 		})
@@ -1956,9 +1946,7 @@ func TestAuthToken_Expired_RefreshSuccess(t *testing.T) {
 	}
 
 	// Read captured stdout
-	var captured bytes.Buffer
-	captured.ReadFrom(r)
-	output := captured.String()
+	output := readTestOutput(t, r)
 	if !strings.Contains(output, "refreshed_token_abc") {
 		t.Errorf("expected refreshed token in output, got: %s", output)
 	}
@@ -1989,7 +1977,7 @@ func TestWebhookDelete_Success(t *testing.T) {
 func TestWebhookDelete_APIError(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`{"error":{"type":"not_found","message":"webhook not found"}}`))
+		writeTestBody(t, w, []byte(`{"error":{"type":"not_found","message":"webhook not found"}}`))
 	})
 	defer srv.Close()
 
@@ -2006,7 +1994,7 @@ func TestWebhookDelete_APIError(t *testing.T) {
 func TestWebhookList_WithData(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"webhooks": []map[string]any{
 				{"id": "wh_1", "url": "https://example.com/hook", "events": []string{"trade"}, "active": true},
 				{"id": "wh_2", "url": "https://example.com/hook2", "events": []string{"quote"}, "active": false},
@@ -2031,7 +2019,7 @@ func TestWebhookCreate_Success(t *testing.T) {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"id":     "wh_new",
 			"url":    "https://example.com/hook",
 			"events": []string{"trade"},
@@ -2053,7 +2041,7 @@ func TestWebhookCreate_Success(t *testing.T) {
 func TestOpenapiDownload_Success(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("openapi: 3.0.0\ninfo:\n  title: VecTrade API"))
+		writeTestBody(t, w, []byte("openapi: 3.0.0\ninfo:\n  title: VecTrade API"))
 	})
 	defer srv.Close()
 
@@ -2104,7 +2092,7 @@ func TestAuthStatus_NoCreds(t *testing.T) {
 func TestQuote_TableOutput(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"symbol": "TSLA",
 			"price":  250.00,
 			"change": 5.50,
@@ -2125,10 +2113,10 @@ func TestQuote_TableOutput(t *testing.T) {
 func TestKeysCreate_Success(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
-			"key":   "vq_new_key_123",
-			"id":    "k_1",
-			"label": "test-key",
+		writeTestJSON(t, w, map[string]any{
+			"raw_key": "vq_new_key_123",
+			"id":      "k_1",
+			"label":   "test-key",
 		})
 	})
 	defer srv.Close()
@@ -2162,7 +2150,7 @@ func TestKeysRevoke_Success(t *testing.T) {
 func TestKeysList_Success(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"keys": []map[string]any{
 				{"id": "k1", "label": "my-key", "prefix": "vq_abc"},
 			},
@@ -2183,7 +2171,7 @@ func TestKeysList_Success(t *testing.T) {
 func TestUsage_Success(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
+		writeTestJSON(t, w, map[string]any{
 			"plan":       "free",
 			"used":       150,
 			"limit":      1000,
@@ -2235,7 +2223,7 @@ func TestOpenapiDownload_WithVersion(t *testing.T) {
 			t.Errorf("version param = %q, want v2", v)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("openapi: 3.0.0"))
+		writeTestBody(t, w, []byte("openapi: 3.0.0"))
 	})
 	defer srv.Close()
 
@@ -2254,7 +2242,7 @@ func TestOpenapiDownload_WithVersion(t *testing.T) {
 func TestOpenapiDownload_APIError(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"error":{"type":"server_error","message":"fail"}}`))
+		writeTestBody(t, w, []byte(`{"error":{"type":"server_error","message":"fail"}}`))
 	})
 	defer srv.Close()
 
@@ -2271,7 +2259,7 @@ func TestOpenapiDownload_APIError(t *testing.T) {
 func TestQuote_JSONOutput(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{"symbol": "GOOG", "price": 180.5})
+		writeTestJSON(t, w, map[string]any{"symbol": "GOOG", "price": 180.5})
 	})
 	defer srv.Close()
 
@@ -2288,7 +2276,7 @@ func TestQuote_JSONOutput(t *testing.T) {
 func TestWebhookList_APIError(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte(`{"error":{"type":"forbidden","message":"no access"}}`))
+		writeTestBody(t, w, []byte(`{"error":{"type":"forbidden","message":"no access"}}`))
 	})
 	defer srv.Close()
 
@@ -2305,7 +2293,7 @@ func TestWebhookList_APIError(t *testing.T) {
 func TestUsage_APIError(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"error":{"type":"unauthorized","message":"invalid key"}}`))
+		writeTestBody(t, w, []byte(`{"error":{"type":"unauthorized","message":"invalid key"}}`))
 	})
 	defer srv.Close()
 
@@ -2336,7 +2324,7 @@ func TestWebhookListen_NoAPIKey(t *testing.T) {
 func TestKeysCreate_APIError(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte(`{"error":{"type":"forbidden","message":"quota exceeded"}}`))
+		writeTestBody(t, w, []byte(`{"error":{"type":"forbidden","message":"quota exceeded"}}`))
 	})
 	defer srv.Close()
 
@@ -2353,7 +2341,7 @@ func TestKeysCreate_APIError(t *testing.T) {
 func TestKeysList_APIError(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"error":{"type":"unauthorized","message":"bad key"}}`))
+		writeTestBody(t, w, []byte(`{"error":{"type":"unauthorized","message":"bad key"}}`))
 	})
 	defer srv.Close()
 
@@ -2370,7 +2358,7 @@ func TestKeysList_APIError(t *testing.T) {
 func TestKeysRevoke_APIError(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`{"error":{"type":"not_found","message":"key not found"}}`))
+		writeTestBody(t, w, []byte(`{"error":{"type":"not_found","message":"key not found"}}`))
 	})
 	defer srv.Close()
 
@@ -2434,9 +2422,7 @@ func TestVersionCmd_WithBuildInfo(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	out := buf.String()
+	out := readTestOutput(t, r)
 	if !strings.Contains(out, "abc1234") {
 		t.Errorf("expected commit in output, got: %s", out)
 	}
@@ -2462,7 +2448,7 @@ func TestAICmd_NoAPIKey(t *testing.T) {
 func TestWebhookCreate_APIError(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error":{"type":"bad_request","message":"invalid URL"}}`))
+		writeTestBody(t, w, []byte(`{"error":{"type":"bad_request","message":"invalid URL"}}`))
 	})
 	defer srv.Close()
 
@@ -2498,7 +2484,9 @@ func TestOpenapiDiff_NoAPIKey(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	// Create local file so it passes the file check
-	os.WriteFile("openapi.yaml", []byte("test"), 0644)
+	if err := os.WriteFile("openapi.yaml", []byte("test"), 0o600); err != nil {
+		t.Fatalf("write local OpenAPI fixture: %v", err)
+	}
 	defer os.Remove("openapi.yaml")
 
 	rootCmd.SetArgs([]string{"openapi", "diff"})
@@ -2624,7 +2612,7 @@ func TestAuthToken_Expired_RefreshFails(t *testing.T) {
 	// Mock server that rejects refresh
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte("token revoked"))
+		writeTestBody(t, w, []byte("token revoked"))
 	})
 	defer srv.Close()
 
@@ -2639,7 +2627,9 @@ func TestAuthToken_Expired_RefreshFails(t *testing.T) {
 		Provider:     "google",
 		BaseURL:      srv.URL,
 	}
-	auth.SaveCredentials(creds)
+	if err := auth.SaveCredentials(creds); err != nil {
+		t.Fatalf("save expired credentials: %v", err)
+	}
 
 	rootCmd.SetArgs([]string{"auth", "token"})
 	err := rootCmd.Execute()
@@ -2660,7 +2650,9 @@ func TestAuthLogout_WithCreds(t *testing.T) {
 		Provider:     "google",
 		BaseURL:      "https://api.vectrade.io/v1",
 	}
-	auth.SaveCredentials(creds)
+	if err := auth.SaveCredentials(creds); err != nil {
+		t.Fatalf("save credentials: %v", err)
+	}
 
 	rootCmd.SetArgs([]string{"auth", "logout"})
 	err := rootCmd.Execute()
@@ -2688,7 +2680,9 @@ func TestAuthStatus_Expired(t *testing.T) {
 		BaseURL:      "https://api.vectrade.io/v1",
 		SessionID:    "sess_xyz",
 	}
-	auth.SaveCredentials(creds)
+	if err := auth.SaveCredentials(creds); err != nil {
+		t.Fatalf("save expired credentials: %v", err)
+	}
 
 	rootCmd.SetArgs([]string{"auth", "status"})
 	err := rootCmd.Execute()
@@ -2709,7 +2703,9 @@ func TestAuthToken_Valid(t *testing.T) {
 		Provider:     "google",
 		BaseURL:      "https://api.vectrade.io/v1",
 	}
-	auth.SaveCredentials(creds)
+	if err := auth.SaveCredentials(creds); err != nil {
+		t.Fatalf("save credentials: %v", err)
+	}
 
 	rootCmd.SetArgs([]string{"auth", "token"})
 	oldStdout := os.Stdout
@@ -2725,17 +2721,16 @@ func TestAuthToken_Valid(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	if !strings.Contains(buf.String(), "valid_access_token_123") {
-		t.Errorf("expected token in output, got: %s", buf.String())
+	output := readTestOutput(t, r)
+	if !strings.Contains(output, "valid_access_token_123") {
+		t.Errorf("expected token in output, got: %s", output)
 	}
 }
 
 func TestQuote_InvalidJSON(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("not json"))
+		writeTestBody(t, w, []byte("not json"))
 	})
 	defer srv.Close()
 
@@ -2755,7 +2750,7 @@ func TestQuote_WithFields(t *testing.T) {
 			http.Error(w, "missing fields", 400)
 			return
 		}
-		json.NewEncoder(w).Encode(map[string]any{"symbol": "AAPL", "price": 100.0})
+		writeTestJSON(t, w, map[string]any{"symbol": "AAPL", "price": 100.0})
 	})
 	defer srv.Close()
 
@@ -2793,7 +2788,9 @@ func TestAuthStatus_WithValidCreds(t *testing.T) {
 		BaseURL:      "https://api.vectrade.io/v1",
 		SessionID:    "sess_abc",
 	}
-	auth.SaveCredentials(creds)
+	if err := auth.SaveCredentials(creds); err != nil {
+		t.Fatalf("save credentials: %v", err)
+	}
 
 	rootCmd.SetArgs([]string{"auth", "status"})
 	err := rootCmd.Execute()
@@ -2817,7 +2814,7 @@ func TestAuthLogin_ValidProvider_LoginFails(t *testing.T) {
 	// Use a mock server that returns 500 for the authorize URL request
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("server error"))
+		writeTestBody(t, w, []byte("server error"))
 	})
 	defer srv.Close()
 
@@ -2836,7 +2833,7 @@ func TestAuthLogin_ValidProvider_LoginFails(t *testing.T) {
 func TestKeysCreate_InvalidJSON(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("not json"))
+		writeTestBody(t, w, []byte("not json"))
 	})
 	defer srv.Close()
 
@@ -2853,7 +2850,7 @@ func TestKeysCreate_InvalidJSON(t *testing.T) {
 func TestKeysList_InvalidJSON(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("not json"))
+		writeTestBody(t, w, []byte("not json"))
 	})
 	defer srv.Close()
 
@@ -2870,7 +2867,7 @@ func TestKeysList_InvalidJSON(t *testing.T) {
 func TestKeysList_Empty(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{"data": []any{}})
+		writeTestJSON(t, w, map[string]any{"data": []any{}})
 	})
 	defer srv.Close()
 
@@ -2887,7 +2884,7 @@ func TestKeysList_Empty(t *testing.T) {
 func TestUsage_InvalidJSON(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("not json"))
+		writeTestBody(t, w, []byte("not json"))
 	})
 	defer srv.Close()
 
@@ -2904,7 +2901,7 @@ func TestUsage_InvalidJSON(t *testing.T) {
 func TestWebhookList_InvalidJSON(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("not json"))
+		writeTestBody(t, w, []byte("not json"))
 	})
 	defer srv.Close()
 
@@ -2921,7 +2918,7 @@ func TestWebhookList_InvalidJSON(t *testing.T) {
 func TestWebhookCreate_InvalidJSON(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("not json"))
+		writeTestBody(t, w, []byte("not json"))
 	})
 	defer srv.Close()
 
@@ -2938,7 +2935,7 @@ func TestWebhookCreate_InvalidJSON(t *testing.T) {
 func TestOpenapiDownload_PathTraversal(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("openapi: 3.0.0"))
+		writeTestBody(t, w, []byte("openapi: 3.0.0"))
 	})
 	defer srv.Close()
 
@@ -2958,7 +2955,7 @@ func TestOpenapiDownload_PathTraversal(t *testing.T) {
 func TestOpenapiDiff_ReadLocalError(t *testing.T) {
 	srv := testServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("openapi: 3.0.0"))
+		writeTestBody(t, w, []byte("openapi: 3.0.0"))
 	})
 	defer srv.Close()
 

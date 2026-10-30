@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/VecTrade-io/vectrade-cli/internal/auth"
 	"github.com/VecTrade-io/vectrade-cli/internal/config"
+	"github.com/spf13/cobra"
 )
 
 var (

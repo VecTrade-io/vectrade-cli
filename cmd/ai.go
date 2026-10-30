@@ -8,9 +8,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/VecTrade-io/vectrade-cli/internal/api"
 	"github.com/VecTrade-io/vectrade-cli/internal/config"
+	"github.com/spf13/cobra"
 )
 
 var aiCmd = &cobra.Command{

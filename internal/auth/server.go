@@ -12,7 +12,7 @@ import (
 
 const (
 	contentTypeHTML = "text/html; charset=utf-8"
-	hdrCT          = "Content-Type"
+	hdrCT           = "Content-Type"
 )
 
 // callbackResult holds the authorization code received from the OAuth provider.

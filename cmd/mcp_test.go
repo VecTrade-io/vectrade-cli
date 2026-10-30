@@ -44,8 +44,7 @@ func TestGetMCPConfigPath_Claude(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	switch runtime.GOOS {
-	case "darwin":
+	if runtime.GOOS == "darwin" {
 		if filename != "claude_desktop_config.json" {
 			t.Errorf("expected claude_desktop_config.json, got %s", filename)
 		}

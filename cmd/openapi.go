@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/VecTrade-io/vectrade-cli/internal/api"
 	"github.com/VecTrade-io/vectrade-cli/internal/config"
+	"github.com/spf13/cobra"
 )
 
 var openapiCmd = &cobra.Command{
@@ -96,7 +96,7 @@ func runOpenapiDownload(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if err := os.WriteFile(absOutput, body, 0o644); err != nil {
+	if err := os.WriteFile(absOutput, body, 0o600); err != nil {
 		return fmt.Errorf("writing spec: %w", err)
 	}
 

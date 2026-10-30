@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -32,13 +31,12 @@ func TestForwardEvent_LocalhostAllowed(t *testing.T) {
 	w.Close()
 	os.Stdout = old
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	output := readTestOutput(t, r)
 	if !received {
 		t.Error("forward should have reached localhost server")
 	}
-	if !strings.Contains(buf.String(), "Forwarded") {
-		t.Errorf("expected 'Forwarded' in output, got: %s", buf.String())
+	if !strings.Contains(output, "Forwarded") {
+		t.Errorf("expected 'Forwarded' in output, got: %s", output)
 	}
 }
 
@@ -67,10 +65,9 @@ func TestForwardEvent_SSRF_Blocked(t *testing.T) {
 			w.Close()
 			os.Stderr = oldErr
 
-			var buf bytes.Buffer
-			buf.ReadFrom(r)
-			if !strings.Contains(buf.String(), "Forward blocked") {
-				t.Errorf("expected SSRF blocked for %s, got: %s", tc.url, buf.String())
+			output := readTestOutput(t, r)
+			if !strings.Contains(output, "Forward blocked") {
+				t.Errorf("expected SSRF blocked for %s, got: %s", tc.url, output)
 			}
 		})
 	}
@@ -88,9 +85,7 @@ func TestForwardEvent_IPv6Localhost(t *testing.T) {
 	w.Close()
 	os.Stderr = oldErr
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	// Should NOT say "blocked" — it's an allowed address
 	if strings.Contains(output, "Forward blocked") {
 		t.Error("IPv6 localhost should be allowed, not blocked")
@@ -109,8 +104,7 @@ func TestForwardEvent_127001_Allowed(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// Replace localhost with 127.0.0.1
-	url := strings.Replace(srv.URL, "127.0.0.1", "127.0.0.1", 1)
+	url := srv.URL
 
 	old := os.Stdout
 	_, w, _ := os.Pipe()
@@ -137,10 +131,9 @@ func TestForwardEvent_InvalidURL(t *testing.T) {
 	w.Close()
 	os.Stderr = oldErr
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	if !strings.Contains(buf.String(), "Forward blocked") {
-		t.Errorf("expected 'Forward blocked' for invalid URL, got: %s", buf.String())
+	output := readTestOutput(t, r)
+	if !strings.Contains(output, "Forward blocked") {
+		t.Errorf("expected 'Forward blocked' for invalid URL, got: %s", output)
 	}
 }
 
@@ -181,14 +174,13 @@ func TestForwardEvent_ServerError(t *testing.T) {
 	w.Close()
 	os.Stdout = old
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	output := readTestOutput(t, r)
 	// Should still say "Forwarded" with the status code
-	if !strings.Contains(buf.String(), "Forwarded") {
-		t.Errorf("expected 'Forwarded' message, got: %s", buf.String())
+	if !strings.Contains(output, "Forwarded") {
+		t.Errorf("expected 'Forwarded' message, got: %s", output)
 	}
-	if !strings.Contains(buf.String(), "500") {
-		t.Errorf("expected status 500 in output, got: %s", buf.String())
+	if !strings.Contains(output, "500") {
+		t.Errorf("expected status 500 in output, got: %s", output)
 	}
 }
 
@@ -197,9 +189,15 @@ func TestStreamWebhookEvents(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("data: {\"type\":\"quote.update\",\"symbol\":\"AAPL\"}\n\n"))
-		w.Write([]byte(": keepalive\n\n"))
-		w.Write([]byte("data: {\"type\":\"webhook.test\"}\n\n"))
+		if _, err := w.Write([]byte("data: {\"type\":\"quote.update\",\"symbol\":\"AAPL\"}\n\n")); err != nil {
+			t.Errorf("write mock event: %v", err)
+		}
+		if _, err := w.Write([]byte(": keepalive\n\n")); err != nil {
+			t.Errorf("write mock keepalive: %v", err)
+		}
+		if _, err := w.Write([]byte("data: {\"type\":\"webhook.test\"}\n\n")); err != nil {
+			t.Errorf("write mock event: %v", err)
+		}
 	}))
 	defer srv.Close()
 
@@ -227,9 +225,7 @@ func TestStreamWebhookEvents(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := readTestOutput(t, r)
 	if !strings.Contains(output, "quote.update") {
 		t.Errorf("expected 'quote.update' in output, got: %s", output)
 	}
@@ -249,7 +245,9 @@ func TestStreamWebhookEvents_WithForward(t *testing.T) {
 	sseSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("data: {\"type\":\"test.event\"}\n\n"))
+		if _, err := w.Write([]byte("data: {\"type\":\"test.event\"}\n\n")); err != nil {
+			t.Errorf("write mock webhook event: %v", err)
+		}
 	}))
 	defer sseSrv.Close()
 
@@ -282,7 +280,9 @@ func TestStreamWebhookEvents_WithForward(t *testing.T) {
 func TestStreamWebhookEvents_APIError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"error":{"type":"unauthorized","message":"bad key"}}`))
+		if _, err := w.Write([]byte(`{"error":{"type":"unauthorized","message":"bad key"}}`)); err != nil {
+			t.Errorf("write mock error response: %v", err)
+		}
 	}))
 	defer srv.Close()
 

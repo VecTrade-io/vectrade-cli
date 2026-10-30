@@ -2,7 +2,8 @@
 // Run with: go test -tags=live ./tests/ -v
 //
 // Required environment:
-//   VECTRADE_TEST_API_KEY - a valid API key (any plan)
+//
+//	VECTRADE_TEST_API_KEY - a valid API key (any plan)
 //
 // These tests verify:
 //   - Authentication is enforced (X-API-Key header)
@@ -14,6 +15,7 @@ package tests
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -66,8 +68,8 @@ func TestLive_AuthRequired(t *testing.T) {
 		t.Fatal("expected auth error with invalid key, got nil")
 	}
 
-	apiErr, ok := err.(*api.APIError)
-	if !ok {
+	var apiErr *api.APIError
+	if !errors.As(err, &apiErr) {
 		t.Fatalf("expected *api.APIError, got %T: %v", err, err)
 	}
 	if apiErr.StatusCode != 401 && apiErr.StatusCode != 403 {
@@ -173,8 +175,8 @@ func TestLive_QuoteInvalidSymbol(t *testing.T) {
 		t.Fatal("expected error for invalid symbol")
 	}
 
-	apiErr, ok := err.(*api.APIError)
-	if !ok {
+	var apiErr *api.APIError
+	if !errors.As(err, &apiErr) {
 		t.Fatalf("expected *api.APIError, got %T", err)
 	}
 	if apiErr.StatusCode != 404 && apiErr.StatusCode != 400 {
@@ -367,8 +369,8 @@ func TestLive_ScopeEnforcement(t *testing.T) {
 		return
 	}
 
-	apiErr, ok := err.(*api.APIError)
-	if !ok {
+	var apiErr *api.APIError
+	if !errors.As(err, &apiErr) {
 		// Could be a 404 which is also fine (endpoint doesn't exist)
 		return
 	}
@@ -388,8 +390,8 @@ func TestLive_AIAnalyzeEndpoint(t *testing.T) {
 		"stream": false,
 	})
 	if err != nil {
-		apiErr, ok := err.(*api.APIError)
-		if ok && (apiErr.StatusCode == 402 || apiErr.StatusCode == 403 || apiErr.StatusCode == 429 || apiErr.StatusCode == 404) {
+		var apiErr *api.APIError
+		if errors.As(err, &apiErr) && (apiErr.StatusCode == 402 || apiErr.StatusCode == 403 || apiErr.StatusCode == 429 || apiErr.StatusCode == 404) {
 			t.Skipf("AI endpoint restricted/unavailable for this plan: %v", err)
 		}
 		t.Fatalf("AI analyze failed: %v", err)
@@ -412,8 +414,8 @@ func TestLive_WebhookListEndpoint(t *testing.T) {
 
 	body, err := client.Get(context.Background(), "/vq/webhooks", nil)
 	if err != nil {
-		apiErr, ok := err.(*api.APIError)
-		if ok && (apiErr.StatusCode == 404 || apiErr.StatusCode == 403) {
+		var apiErr *api.APIError
+		if errors.As(err, &apiErr) && (apiErr.StatusCode == 404 || apiErr.StatusCode == 403) {
 			t.Skipf("webhooks not available for this plan: %v", err)
 		}
 		t.Fatalf("webhook list failed: %v", err)
@@ -474,7 +476,9 @@ func TestLive_QuotaDecrement(t *testing.T) {
 		t.Skipf("usage endpoint not available: %v", err)
 	}
 	var before map[string]any
-	json.Unmarshal(beforeBody, &before)
+	if err := json.Unmarshal(beforeBody, &before); err != nil {
+		t.Fatalf("decode usage before request: %v", err)
+	}
 
 	// Make a request
 	_, err = client.Get(context.Background(), "/vq/quotes/TSLA", nil)
@@ -491,7 +495,9 @@ func TestLive_QuotaDecrement(t *testing.T) {
 		t.Skipf("usage endpoint not available: %v", err)
 	}
 	var after map[string]any
-	json.Unmarshal(afterBody, &after)
+	if err := json.Unmarshal(afterBody, &after); err != nil {
+		t.Fatalf("decode usage after request: %v", err)
+	}
 
 	// Log comparison
 	t.Logf("usage before: %v", before)
@@ -505,8 +511,8 @@ func TestLive_OpenAPISpec(t *testing.T) {
 
 	body, err := client.Get(context.Background(), "/vq/openapi", nil)
 	if err != nil {
-		apiErr, ok := err.(*api.APIError)
-		if ok && apiErr.StatusCode == 404 {
+		var apiErr *api.APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == 404 {
 			t.Skip("openapi endpoint not available")
 		}
 		t.Fatalf("openapi request failed: %v", err)

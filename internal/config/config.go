@@ -14,6 +14,7 @@ import (
 
 const (
 	// EnvAPIKey is the environment variable for the API key.
+	// #nosec G101 -- this is an environment-variable name, not a credential.
 	EnvAPIKey = "VECTRADE_API_KEY"
 
 	// EnvBaseURL is the environment variable for a custom base URL.

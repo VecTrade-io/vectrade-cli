@@ -279,8 +279,12 @@ func TestLoadCredentials_InvalidJSON(t *testing.T) {
 
 	// Create credentials file with invalid JSON at the platform-specific path
 	dir, _ := CredentialsDir()
-	os.MkdirAll(dir, 0700)
-	os.WriteFile(filepath.Join(dir, "credentials.json"), []byte("not valid json{"), 0600)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		t.Fatalf("create credentials directory: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "credentials.json"), []byte("not valid json{"), 0600); err != nil {
+		t.Fatalf("write invalid credentials fixture: %v", err)
+	}
 
 	_, err := LoadCredentials()
 	if err == nil {
@@ -323,7 +327,9 @@ func TestClearCredentials_NoFileIsOK(t *testing.T) {
 
 	// Ensure dir exists but no creds file
 	dir, _ := CredentialsDir()
-	os.MkdirAll(dir, 0700)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		t.Fatalf("create credentials directory: %v", err)
+	}
 
 	if err := ClearCredentials(); err != nil {
 		t.Errorf("ClearCredentials with no file should succeed: %v", err)

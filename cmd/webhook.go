@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/VecTrade-io/vectrade-cli/internal/api"
 	"github.com/VecTrade-io/vectrade-cli/internal/config"
+	"github.com/spf13/cobra"
 )
 
 var webhookCmd = &cobra.Command{
@@ -64,8 +64,12 @@ func init() {
 
 	webhookCreateCmd.Flags().StringVar(&webhookURL, "url", "", "webhook delivery URL")
 	webhookCreateCmd.Flags().StringSliceVar(&webhookEvents, "events", nil, "events to subscribe to")
-	webhookCreateCmd.MarkFlagRequired("url")
-	webhookCreateCmd.MarkFlagRequired("events")
+	if err := webhookCreateCmd.MarkFlagRequired("url"); err != nil {
+		panic(err)
+	}
+	if err := webhookCreateCmd.MarkFlagRequired("events"); err != nil {
+		panic(err)
+	}
 
 	webhookCmd.AddCommand(webhookListenCmd)
 	webhookCmd.AddCommand(webhookListCmd)

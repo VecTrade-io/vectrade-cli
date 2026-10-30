@@ -10,3 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Initial release
+
+### Changed
+
+- Pin GoReleaser v2.9.0 to preserve current Homebrew formula and Docker manifest behavior pending a planned distribution migration; build releases and run security scans on patched Go 1.26.10.

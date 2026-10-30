@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -100,7 +101,7 @@ func TestLoad_ConfigFile(t *testing.T) {
 
 func TestValidate_NoKey(t *testing.T) {
 	cfg := &Config{BaseURL: DefaultBaseURL}
-	if err := cfg.Validate(); err != ErrNoAPIKey {
+	if err := cfg.Validate(); !errors.Is(err, ErrNoAPIKey) {
 		t.Errorf("expected ErrNoAPIKey, got %v", err)
 	}
 }
@@ -255,7 +256,9 @@ func TestLoadStoredJWT_ValidFile(t *testing.T) {
 
 	// Create credentials file at the platform-specific path
 	credsDir, _ := auth.CredentialsDir()
-	os.MkdirAll(credsDir, 0700)
+	if err := os.MkdirAll(credsDir, 0700); err != nil {
+		t.Fatalf("create credentials directory: %v", err)
+	}
 
 	creds := map[string]any{
 		"access_token":  "jwt_stored_token_123",
@@ -263,7 +266,9 @@ func TestLoadStoredJWT_ValidFile(t *testing.T) {
 		"session_id":    "sess",
 	}
 	data, _ := json.Marshal(creds)
-	os.WriteFile(filepath.Join(credsDir, "credentials.json"), data, 0600)
+	if err := os.WriteFile(filepath.Join(credsDir, "credentials.json"), data, 0600); err != nil {
+		t.Fatalf("write credentials fixture: %v", err)
+	}
 
 	jwt, err := loadStoredJWT()
 	if err != nil {
@@ -280,8 +285,12 @@ func TestLoadStoredJWT_InvalidJSON(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
 
 	credsDir, _ := auth.CredentialsDir()
-	os.MkdirAll(credsDir, 0700)
-	os.WriteFile(filepath.Join(credsDir, "credentials.json"), []byte("invalid{json"), 0600)
+	if err := os.MkdirAll(credsDir, 0700); err != nil {
+		t.Fatalf("create credentials directory: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(credsDir, "credentials.json"), []byte("invalid{json"), 0600); err != nil {
+		t.Fatalf("write invalid credentials fixture: %v", err)
+	}
 
 	_, err := loadStoredJWT()
 	if err == nil {
@@ -299,10 +308,14 @@ func TestLoad_JWTFallbackWhenNoAPIKey(t *testing.T) {
 
 	// Create credentials file with JWT
 	credsDir, _ := auth.CredentialsDir()
-	os.MkdirAll(credsDir, 0700)
+	if err := os.MkdirAll(credsDir, 0700); err != nil {
+		t.Fatalf("create credentials directory: %v", err)
+	}
 	creds := map[string]any{"access_token": "jwt_fallback_tok"}
 	data, _ := json.Marshal(creds)
-	os.WriteFile(filepath.Join(credsDir, "credentials.json"), data, 0600)
+	if err := os.WriteFile(filepath.Join(credsDir, "credentials.json"), data, 0600); err != nil {
+		t.Fatalf("write credentials fixture: %v", err)
+	}
 
 	cfg := Load("", false, "/nonexistent/path.yaml")
 	if cfg.JWTToken != "jwt_fallback_tok" {
@@ -320,10 +333,14 @@ func TestLoad_APIKeyPreventsJWTFallback(t *testing.T) {
 
 	// Create credentials file with JWT
 	credsDir, _ := auth.CredentialsDir()
-	os.MkdirAll(credsDir, 0700)
+	if err := os.MkdirAll(credsDir, 0700); err != nil {
+		t.Fatalf("create credentials directory: %v", err)
+	}
 	creds := map[string]any{"access_token": "jwt_should_not_load"}
 	data, _ := json.Marshal(creds)
-	os.WriteFile(filepath.Join(credsDir, "credentials.json"), data, 0600)
+	if err := os.WriteFile(filepath.Join(credsDir, "credentials.json"), data, 0600); err != nil {
+		t.Fatalf("write credentials fixture: %v", err)
+	}
 
 	cfg := Load("", false, "/nonexistent/path.yaml")
 	if cfg.JWTToken != "" {
