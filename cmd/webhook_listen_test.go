@@ -72,11 +72,19 @@ func TestRunWebhookListen_StopsWhenContextIsCancelled(t *testing.T) {
 
 func TestRunWebhookListen_RequiresCredentials(t *testing.T) {
 	t.Setenv("VECTRADE_API_KEY", "")
+	t.Setenv("VECTRADE_BASE_URL", "http://127.0.0.1:1")
 	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", "")
 
-	origCfg := cfgFile
-	cfgFile = filepath.Join(t.TempDir(), "missing.yaml")
-	defer func() { cfgFile = origCfg }()
+	// Flag variables persist between tests in this package.
+	origCfg, origKey := cfgFile, apiKey
+	cfgFile, apiKey = filepath.Join(t.TempDir(), "missing.yaml"), ""
+	defer func() { cfgFile, apiKey = origCfg, origKey }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	webhookListenCmd.SetContext(ctx)
+	defer webhookListenCmd.SetContext(context.Background())
 
 	if err := runWebhookListen(webhookListenCmd, nil); err == nil {
 		t.Fatal("expected an error when no API key is configured")
