@@ -136,6 +136,7 @@ func (c *Config) AuthInfo() (AuthType, string) {
 }
 
 // AuthHeader returns the appropriate Authorization header value.
+//
 // Deprecated: Use AuthInfo() for proper header selection.
 func (c *Config) AuthHeader() string {
 	if c.APIKey != "" {

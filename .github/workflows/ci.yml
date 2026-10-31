@@ -10,6 +10,10 @@ permissions:
   contents: read
   pull-requests: write
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   GO_VERSION_FILE: go.mod
   COVERAGE_THRESHOLD: 90
@@ -23,16 +27,18 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: ${{ env.GO_VERSION_FILE }}
-      - uses: golangci/golangci-lint-action@v6
+      - uses: golangci/golangci-lint-action@v9
         with:
-          version: v1.64.5
+          version: v2.15.0
 
   test:
     name: Test (Go ${{ matrix.go-version }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        go-version: ["1.22", "1.23"]
+        # The two Go releases that still receive security fixes.
+        go-version: ["1.25", "1.26"]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
@@ -54,8 +60,8 @@ jobs:
           echo "coverage=${total}" >> "$GITHUB_OUTPUT"
 
       - name: Upload coverage
-        if: matrix.go-version == '1.23'
-        uses: actions/upload-artifact@v4
+        if: matrix.go-version == '1.26'
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage.out
@@ -64,6 +70,7 @@ jobs:
     name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -26,7 +27,7 @@ func TestForwardEvent_LocalhostAllowed(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	forwardEvent(srv.URL, `{"event":"test"}`)
+	forwardEvent(context.Background(), srv.URL, `{"event":"test"}`)
 
 	w.Close()
 	os.Stdout = old
@@ -60,7 +61,7 @@ func TestForwardEvent_SSRF_Blocked(t *testing.T) {
 			r, w, _ := os.Pipe()
 			os.Stderr = w
 
-			forwardEvent(tc.url, `{"event":"test"}`)
+			forwardEvent(context.Background(), tc.url, `{"event":"test"}`)
 
 			w.Close()
 			os.Stderr = oldErr
@@ -80,7 +81,7 @@ func TestForwardEvent_IPv6Localhost(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stderr = w
 
-	forwardEvent("http://[::1]:12345/test", `{"event":"test"}`)
+	forwardEvent(context.Background(), "http://[::1]:12345/test", `{"event":"test"}`)
 
 	w.Close()
 	os.Stderr = oldErr
@@ -110,7 +111,7 @@ func TestForwardEvent_127001_Allowed(t *testing.T) {
 	_, w, _ := os.Pipe()
 	os.Stdout = w
 
-	forwardEvent(url, `{"event":"test"}`)
+	forwardEvent(context.Background(), url, `{"event":"test"}`)
 
 	w.Close()
 	os.Stdout = old
@@ -126,7 +127,7 @@ func TestForwardEvent_InvalidURL(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stderr = w
 
-	forwardEvent("://bad-url", `{"event":"test"}`)
+	forwardEvent(context.Background(), "://bad-url", `{"event":"test"}`)
 
 	w.Close()
 	os.Stderr = oldErr
@@ -149,7 +150,7 @@ func TestForwardEvent_ContentType(t *testing.T) {
 	_, w, _ := os.Pipe()
 	os.Stdout = w
 
-	forwardEvent(srv.URL, `{"event":"test"}`)
+	forwardEvent(context.Background(), srv.URL, `{"event":"test"}`)
 
 	w.Close()
 	os.Stdout = old
@@ -169,7 +170,7 @@ func TestForwardEvent_ServerError(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	forwardEvent(srv.URL, `{"event":"test"}`)
+	forwardEvent(context.Background(), srv.URL, `{"event":"test"}`)
 
 	w.Close()
 	os.Stdout = old
@@ -216,7 +217,7 @@ func TestStreamWebhookEvents(t *testing.T) {
 	listenForward = ""
 	defer func() { listenForward = origForward }()
 
-	err := streamWebhookEvents(cfg)
+	err := streamWebhookEvents(context.Background(), cfg)
 
 	w.Close()
 	os.Stdout = old
@@ -265,7 +266,7 @@ func TestStreamWebhookEvents_WithForward(t *testing.T) {
 	listenForward = forwardSrv.URL
 	defer func() { listenForward = origForward }()
 
-	_ = streamWebhookEvents(cfg)
+	_ = streamWebhookEvents(context.Background(), cfg)
 
 	w.Close()
 	os.Stdout = old
@@ -292,7 +293,7 @@ func TestStreamWebhookEvents_APIError(t *testing.T) {
 		Timeout: 10,
 	}
 
-	err := streamWebhookEvents(cfg)
+	err := streamWebhookEvents(context.Background(), cfg)
 	if err == nil {
 		t.Error("expected error for 401 response")
 	}
