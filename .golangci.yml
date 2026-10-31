@@ -1,18 +1,28 @@
+version: "2"
+
 linters:
+  # The standard set (errcheck, govet, ineffassign, staticcheck, unused) stays on.
   enable:
-    - errcheck
-    - govet
-    - ineffassign
-    - staticcheck
-    - unused
-    - gosimple
-    - gocritic
-    - misspell
-    - gofmt
-    - gosec
     - bodyclose
     - errorlint
+    - gocritic
+    - gosec
+    - misspell
+  exclusions:
+    # Keep the defaults golangci-lint v1 applied (unchecked Close/Print errors, etc.).
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      # Tests use fixture tokens and temp-file paths by design.
+      - path: _test\.go
+        linters:
+          - gosec
+    paths:
+      - vendor
 
-issues:
-  exclude-dirs:
-    - vendor
+formatters:
+  enable:
+    - gofmt

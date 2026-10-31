@@ -48,7 +48,7 @@ func SaveCredentials(creds *Credentials) error {
 		return fmt.Errorf("creating config directory: %w", err)
 	}
 
-	data, err := json.MarshalIndent(creds, "", "  ")
+	data, err := json.MarshalIndent(creds, "", "  ") //nolint:gosec // persisting tokens is the purpose; file is written 0600
 	if err != nil {
 		return fmt.Errorf("marshaling credentials: %w", err)
 	}
@@ -69,7 +69,7 @@ func LoadCredentials() (*Credentials, error) {
 		return nil, err
 	}
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // path is derived from the user's own config directory
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, nil

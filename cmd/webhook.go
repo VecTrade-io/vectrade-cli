@@ -97,24 +97,30 @@ func runWebhookListen(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Fprintln(os.Stdout, "   Press Ctrl+C to stop")
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	parent := cmd.Context()
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, stop := signal.NotifyContext(parent, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
+	streamDone := make(chan struct{})
 	go func() {
-		err := streamWebhookEvents(cfg)
-		if err != nil {
+		defer close(streamDone)
+		if err := streamWebhookEvents(ctx, cfg); err != nil && ctx.Err() == nil {
 			fmt.Fprintf(os.Stderr, "Stream error: %v\n", err)
 		}
 	}()
 
-	<-sigChan
+	<-ctx.Done()
+	<-streamDone
 	fmt.Fprintln(os.Stdout, "\n✋ Stopped listening.")
 	return nil
 }
 
-func streamWebhookEvents(cfg *config.Config) error {
+func streamWebhookEvents(ctx context.Context, cfg *config.Config) error {
 	client := api.NewClient(cfg)
-	body, err := client.StreamGet(context.Background(), "/vq/webhooks/listen")
+	body, err := client.StreamGet(ctx, "/vq/webhooks/listen")
 	if err != nil {
 		return err
 	}
@@ -133,7 +139,7 @@ func streamWebhookEvents(cfg *config.Config) error {
 				fmt.Fprintf(os.Stdout, "[%s] %s → %s\n", timestamp, eventType, data)
 
 				if listenForward != "" {
-					go forwardEvent(listenForward, data)
+					go forwardEvent(ctx, listenForward, data)
 				}
 			}
 		}
@@ -141,7 +147,7 @@ func streamWebhookEvents(cfg *config.Config) error {
 	return scanner.Err()
 }
 
-func forwardEvent(targetURL, data string) {
+func forwardEvent(ctx context.Context, targetURL, data string) {
 	// Only allow forwarding to localhost URLs to prevent SSRF
 	parsed, err := url.Parse(targetURL)
 	if err != nil {
@@ -154,7 +160,7 @@ func forwardEvent(targetURL, data string) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, targetURL, strings.NewReader(data))

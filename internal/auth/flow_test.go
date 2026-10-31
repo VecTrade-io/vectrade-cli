@@ -443,14 +443,14 @@ func TestLogin_FullFlow(t *testing.T) {
 
 	// Mock backend that serves authorize URL and exchanges code
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/user/oauth/google/authorize/cli":
+		switch r.URL.Path {
+		case "/user/oauth/google/authorize/cli":
 			// Return a URL that will trigger the callback on the local server
 			port := r.URL.Query().Get("port")
 			writeTestJSON(t, w, authorizeResponse{
 				URL: fmt.Sprintf("http://127.0.0.1:%s/callback?code=test_code&state=test_state", port),
 			})
-		case r.URL.Path == "/user/oauth/callback/cli":
+		case "/user/oauth/callback/cli":
 			writeTestJSON(t, w, tokenResponse{
 				Access:    "login_access_token",
 				Refresh:   "login_refresh_token",
@@ -502,13 +502,13 @@ func TestLogin_BrowserFailure_FallsBack(t *testing.T) {
 	t.Setenv("HOME", tmp)
 
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/user/oauth/google/authorize/cli":
+		switch r.URL.Path {
+		case "/user/oauth/google/authorize/cli":
 			port := r.URL.Query().Get("port")
 			writeTestJSON(t, w, authorizeResponse{
 				URL: fmt.Sprintf("http://127.0.0.1:%s/callback?code=c&state=s", port),
 			})
-		case r.URL.Path == "/user/oauth/callback/cli":
+		case "/user/oauth/callback/cli":
 			writeTestJSON(t, w, tokenResponse{Access: "tok", Refresh: "ref"})
 		}
 	}))
@@ -575,12 +575,13 @@ func TestLogin_DefaultTimeout(t *testing.T) {
 	t.Setenv("HOME", tmp)
 
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/user/oauth/google/authorize/cli" {
+		switch r.URL.Path {
+		case "/user/oauth/google/authorize/cli":
 			port := r.URL.Query().Get("port")
 			writeTestJSON(t, w, authorizeResponse{
 				URL: fmt.Sprintf("http://127.0.0.1:%s/callback?code=c&state=s", port),
 			})
-		} else if r.URL.Path == "/user/oauth/callback/cli" {
+		case "/user/oauth/callback/cli":
 			writeTestJSON(t, w, tokenResponse{Access: "a", Refresh: "r"})
 		}
 	}))
@@ -699,12 +700,13 @@ func TestLogin_TokenExchangeError(t *testing.T) {
 	t.Setenv("HOME", tmp)
 
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/user/oauth/google/authorize/cli" {
+		switch r.URL.Path {
+		case "/user/oauth/google/authorize/cli":
 			port := r.URL.Query().Get("port")
 			writeTestJSON(t, w, authorizeResponse{
 				URL: fmt.Sprintf("http://127.0.0.1:%s/callback?code=c&state=s", port),
 			})
-		} else if r.URL.Path == "/user/oauth/callback/cli" {
+		case "/user/oauth/callback/cli":
 			w.WriteHeader(http.StatusInternalServerError)
 			writeTestBody(t, w, []byte("exchange failed"))
 		}
