@@ -8,9 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/VecTrade-io/vectrade-cli/internal/api"
@@ -21,7 +19,7 @@ import (
 var webhookCmd = &cobra.Command{
 	Use:   "webhook",
 	Short: "Manage webhooks",
-	Long:  `Create, list, delete webhooks and listen for events locally.`,
+	Long:  `Create, list, and delete webhook subscriptions.`,
 }
 
 var webhookListenCmd = &cobra.Command{
@@ -29,7 +27,8 @@ var webhookListenCmd = &cobra.Command{
 	Short: "Listen for webhook events locally (like stripe listen)",
 	Long: `Start a local webhook listener that forwards events from VecTrade
 to your local development server. Useful for testing webhook integrations.`,
-	RunE: runWebhookListen,
+	RunE:   runWebhookListen,
+	Hidden: true,
 }
 
 var webhookListCmd = &cobra.Command{
@@ -91,31 +90,7 @@ func runWebhookListen(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(os.Stdout, "⚡ Listening for webhook events on port %d...\n", listenPort)
-	if listenForward != "" {
-		fmt.Fprintf(os.Stdout, "   Forwarding to: %s\n", listenForward)
-	}
-	fmt.Fprintln(os.Stdout, "   Press Ctrl+C to stop")
-
-	parent := cmd.Context()
-	if parent == nil {
-		parent = context.Background()
-	}
-	ctx, stop := signal.NotifyContext(parent, syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
-	streamDone := make(chan struct{})
-	go func() {
-		defer close(streamDone)
-		if err := streamWebhookEvents(ctx, cfg); err != nil && ctx.Err() == nil {
-			fmt.Fprintf(os.Stderr, "Stream error: %v\n", err)
-		}
-	}()
-
-	<-ctx.Done()
-	<-streamDone
-	fmt.Fprintln(os.Stdout, "\n✋ Stopped listening.")
-	return nil
+	return fmt.Errorf("webhook event streaming is not available in core; only subscription management is supported")
 }
 
 func streamWebhookEvents(ctx context.Context, cfg *config.Config) error {
